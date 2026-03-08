@@ -2,8 +2,10 @@ import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import logo from "../../res/logo.png";
+import { useNavigate } from "react-router-dom";
 
 export default function LoginPage() {
+  const navigate = useNavigate();
   const [tab, setTab] = useState("login");
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState("");
@@ -47,7 +49,7 @@ export default function LoginPage() {
     if (error) {
       showToast("✗ " + error.message);
     } else {
-      showToast("✓ welcome back — redirecting to dashboard");
+      navigate("/dashboard");
     }
   };
 
