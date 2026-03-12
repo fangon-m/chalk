@@ -136,8 +136,8 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div className="flex items-center gap-3 mb-10">
-          <img src={logo} alt="logo" className="w-8 h-8 border border-[#ffffff21] rounded-md object-cover" />
-          <span className="font-mono-dm text-white" style={{ fontSize: 12, letterSpacing: "5px", textTransform: "uppercase" }}>CHALK</span>
+          <img src={logo} alt="logo" className="w-18 h-18 object-cover" />
+          <span className="font-mono-dm text-white" style={{ fontSize: 16, letterSpacing: "5px", textTransform: "uppercase", marginLeft: "-15px" }}>CHALK</span>
         </div>
 
         {/* Card */}

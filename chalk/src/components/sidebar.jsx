@@ -37,8 +37,8 @@ export default function Sidebar() {
       <div>
 
       {/* Logo */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "50px", marginLeft: "3px" }}>
-        <img src={logo} alt="logo" style={{ width: 32, height: 32, borderRadius: 6, border: "1px solid #ffffff21" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "50px", marginLeft: "5px", marginTop: "-5px" }}>
+        <img src={logo} alt="logo" style={{ width: 32, height: 32, borderRadius: 6 }} />
         {expanded && (
         <span style={{ fontFamily: "DM Mono", fontSize: 12, letterSpacing: "5px", color: "white", textTransform: "uppercase" }}>
             CHALK</span>
