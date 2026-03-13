@@ -1,0 +1,604 @@
+import { useState, useEffect, useCallback } from "react";
+import {
+  Flame, Plus, Shield, CheckCircle2, Circle, Pencil, Trash2,
+  ChevronDown, ChevronUp, X, Loader2, AlertTriangle, Zap,
+} from "lucide-react";
+import { supabase } from "../lib/supabase";
+import {
+  getStreaks, createStreak, updateStreak, deleteStreak,
+  checkInStreak, getStreakLogs,
+} from "../lib/streaks";
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function isCheckedInToday(logs = []) {
+  const today = new Date().toISOString().slice(0, 10);
+  return logs.some((log) => log.date === today);
+}
+
+function buildCalendarDots(logs = [], days = 28) {
+  const set = new Set(logs.map((l) => l.date));
+  const result = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    result.push({ date: key, checked: set.has(key), isToday: i === 0 });
+  }
+  return result;
+}
+
+// ── Calendar strip ────────────────────────────────────────────────────────────
+
+function CalendarStrip({ logs }) {
+  const dots = buildCalendarDots(logs, 28);
+  const weeks = [];
+  for (let i = 0; i < dots.length; i += 7) weeks.push(dots.slice(i, i + 7));
+
+  return (
+    <div className="flex gap-1 mt-2">
+      {weeks.map((week, wi) => (
+        <div key={wi} className="flex flex-col gap-1">
+          {week.map((day, di) => (
+            <div
+              key={di}
+              title={day.date}
+              className="w-2.5 h-2.5 rounded-sm"
+              style={{
+                background: day.checked ? "#c8f04c" : "rgba(255,255,255,0.07)",
+                outline: day.isToday ? "1.5px solid #c8f04c" : "none",
+                outlineOffset: 1,
+                opacity: day.checked ? 1 : 0.45,
+              }}
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Shield pips ───────────────────────────────────────────────────────────────
+
+function ShieldPips({ count = 0, max = 3 }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      {Array.from({ length: max }).map((_, i) => (
+        <Shield
+          key={i}
+          size={12}
+          style={{
+            color: i < count ? "#60a5fa" : "rgba(255,255,255,0.18)",
+            fill: i < count ? "rgba(96,165,250,0.2)" : "none",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ── Confirm Modal ─────────────────────────────────────────────────────────────
+
+function ConfirmModal({ message, onConfirm, onCancel }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+    >
+      <div
+        className="rounded-2xl border border-white/10 p-6 w-80"
+        style={{ background: "#111" }}
+      >
+        <p className="font-mono text-sm text-white/70 mb-6">{message}</p>
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 rounded-lg border border-white/10 text-white/40 font-mono text-xs tracking-widest hover:text-white/60 transition-colors"
+          >
+            CANCEL
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 rounded-lg font-mono text-xs tracking-widest transition-all"
+            style={{ background: "#ef4444", color: "white" }}
+          >
+            DELETE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Streak Card ───────────────────────────────────────────────────────────────
+
+function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
+  const [expanded, setExpanded] = useState(false);
+  const [logs, setLogs] = useState(null);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const checkedToday = streak._checkedToday ?? false;
+  const accentColor = streak.color || "#c8f04c";
+
+  async function handleExpand() {
+    const next = !expanded;
+    setExpanded(next);
+    if (next && logs === null) {
+      setLoadingLogs(true);
+      try {
+        const data = await getStreakLogs(streak.id);
+        setLogs(data || []);
+      } catch {
+        setLogs([]);
+      } finally {
+        setLoadingLogs(false);
+      }
+    }
+  }
+
+  return (
+    <div
+      className="group relative rounded-2xl border border-white/8 transition-all duration-200 overflow-hidden hover:border-white/20"
+      style={{ background: "#111" }}
+    >
+      {/* Accent stripe */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-2xl"
+        style={{ background: accentColor }}
+      />
+
+      <div className="px-5 py-4 pl-6">
+        {/* Top row */}
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-start gap-3 flex-1 min-w-0">
+            {/* Check-in button */}
+            <button
+              onClick={() => !checkedToday && onCheckIn(streak.id)}
+              disabled={checkedToday || checkingIn === streak.id}
+              className="shrink-0 w-8 h-8 rounded-lg border flex items-center justify-center transition-all"
+              style={{
+                background: checkedToday ? `${accentColor}22` : "rgba(255,255,255,0.05)",
+                borderColor: checkedToday ? accentColor : "rgba(255,255,255,0.1)",
+                cursor: checkedToday ? "default" : "pointer",
+              }}
+            >
+              {checkingIn === streak.id ? (
+                <Loader2 size={14} className="animate-spin" style={{ color: accentColor }} />
+              ) : checkedToday ? (
+                <CheckCircle2 size={14} style={{ color: accentColor }} />
+              ) : (
+                <Circle size={14} className="text-white/30" />
+              )}
+            </button>
+
+            {/* Name + description */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                <h3 className="font-mono text-sm text-white">{streak.name}</h3>
+                {checkedToday && (
+                  <span
+                    className="text-[9px] font-mono tracking-widest border px-1.5 py-0.5 rounded"
+                    style={{
+                      color: accentColor,
+                      borderColor: `${accentColor}40`,
+                      background: `${accentColor}10`,
+                    }}
+                  >
+                    DONE
+                  </span>
+                )}
+              </div>
+              {streak.description && (
+                <p className="text-white/30 text-xs font-mono truncate">{streak.description}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+            <button
+              onClick={handleExpand}
+              className="p-1.5 rounded-lg hover:bg-white/8 text-white/30 hover:text-white/70 transition-all"
+            >
+              {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onEdit(streak); }}
+              className="p-1.5 rounded-lg hover:bg-white/8 text-white/30 hover:text-white/70 transition-all"
+            >
+              <Pencil size={12} />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowConfirm(true); }}
+              className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/30 hover:text-red-400 transition-all"
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
+        </div>
+
+        {/* Stats footer */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 text-white/25">
+              <Flame size={11} style={{ color: accentColor }} />
+              <span className="font-mono text-[10px]">
+                {streak.current_streak ?? 0} day{streak.current_streak !== 1 ? "s" : ""}
+              </span>
+            </div>
+            <div className="flex items-center gap-1 text-white/25">
+              <Zap size={10} />
+              <span className="font-mono text-[10px]">best {streak.longest_streak ?? 0}</span>
+            </div>
+            <ShieldPips count={streak.shields ?? 0} />
+          </div>
+
+          {/* Expand toggle (always visible) */}
+          <button
+            onClick={handleExpand}
+            className="flex items-center gap-1 font-mono text-[10px] tracking-widest text-white/35 hover:text-[#c8f04c] transition-colors"
+          >
+            {expanded ? "HIDE" : "HISTORY"} {expanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+          </button>
+        </div>
+
+        {/* Expanded: 28-day calendar */}
+        {expanded && (
+          <div className="mt-3 pt-3 border-t border-white/8">
+            <span className="font-mono text-[10px] tracking-widest text-white/25 uppercase">
+              Last 28 Days
+            </span>
+            {loadingLogs ? (
+              <div className="flex items-center gap-2 mt-2 text-white/25">
+                <Loader2 size={12} className="animate-spin" />
+                <span className="font-mono text-[10px]">Loading...</span>
+              </div>
+            ) : (
+              <CalendarStrip logs={logs || []} />
+            )}
+          </div>
+        )}
+      </div>
+
+      {showConfirm && (
+        <ConfirmModal
+          message={`Delete "${streak.name}"?`}
+          onConfirm={() => { setShowConfirm(false); onDelete(streak.id); }}
+          onCancel={() => setShowConfirm(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Add / Edit Modal ──────────────────────────────────────────────────────────
+
+function StreakModal({ streak, onClose, onSave }) {
+  const isEdit = !!streak?.id;
+  const [form, setForm] = useState({
+    name: streak?.name || "",
+    description: streak?.description || "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit() {
+    if (!form.name.trim()) return setError("Name is required");
+    setSaving(true);
+    setError("");
+    try {
+      if (isEdit) {
+        await updateStreak(streak.id, { name: form.name.trim(), description: form.description.trim() });
+      } else {
+        await createStreak({ name: form.name.trim(), description: form.description.trim() });
+      }
+      onSave();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)" }}
+    >
+      <div
+        className="relative w-full max-w-lg mx-4 rounded-2xl border border-white/10 overflow-hidden"
+        style={{ background: "#111" }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-white/8">
+          <h2 className="font-mono text-sm tracking-widest text-white/80 uppercase">
+            {isEdit ? "Edit Streak" : "New Streak"}
+          </h2>
+          <button onClick={onClose} className="text-white/30 hover:text-white/70 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
+          {/* Name */}
+          <div>
+            <label className="block font-mono text-[10px] tracking-widest text-white/40 uppercase mb-1.5">
+              Streak Name
+            </label>
+            <input
+              value={form.name}
+              onChange={(e) => { setForm({ ...form, name: e.target.value }); setError(""); }}
+              placeholder="What habit are you building?"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors"
+            />
+            {error && <p className="font-mono text-[10px] text-red-400 mt-1">{error}</p>}
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block font-mono text-[10px] tracking-widest text-white/40 uppercase mb-1.5">
+              Description
+            </label>
+            <input
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              placeholder="Brief context..."
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors"
+            />
+          </div>
+
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-white/8 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg border border-white/10 text-white/40 font-mono text-xs tracking-widest hover:text-white/60 transition-colors"
+          >
+            CANCEL
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={saving || !form.name.trim()}
+            className="px-5 py-2 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2"
+            style={{ background: form.name.trim() ? "#c8f04c" : "#444", color: "#0d0d0d" }}
+          >
+            {saving && <Loader2 size={12} className="animate-spin" />}
+            {isEdit ? "SAVE CHANGES" : "CREATE STREAK"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Streaks Page ─────────────────────────────────────────────────────────
+
+export default function Streaks() {
+  const [streaks, setStreaks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [pageError, setPageError] = useState("");
+  const [checkingIn, setCheckingIn] = useState(null);
+
+  const [showModal, setShowModal] = useState(false);
+  const [editingStreak, setEditingStreak] = useState(null);
+
+  const [tab, setTab] = useState("active"); // "active" | "done"
+  const [todayMap, setTodayMap] = useState({});
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await getStreaks();
+      setStreaks(data || []);
+
+      const today = new Date().toISOString().slice(0, 10);
+      const checks = await Promise.all(
+        (data || []).map((s) =>
+          supabase
+            .from("streak_logs")
+            .select("id")
+            .eq("streak_id", s.id)
+            .eq("date", today)
+            .maybeSingle()
+            .then(({ data: row }) => [s.id, !!row])
+        )
+      );
+      setTodayMap(Object.fromEntries(checks));
+    } catch (e) {
+      setPageError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function handleCheckIn(id) {
+    setCheckingIn(id);
+    try {
+      await checkInStreak(id);
+      setTodayMap((prev) => ({ ...prev, [id]: true }));
+      const fresh = await getStreaks();
+      setStreaks(fresh || []);
+    } catch (e) {
+      setPageError(e.message);
+    } finally {
+      setCheckingIn(null);
+    }
+  }
+
+  async function handleDelete(id) {
+    try {
+      await deleteStreak(id);
+      await load();
+    } catch (e) {
+      setPageError(e.message);
+    }
+  }
+
+  const enriched = streaks.map((s) => ({ ...s, _checkedToday: !!todayMap[s.id] }));
+  const doneCount = Object.values(todayMap).filter(Boolean).length;
+  const totalCount = streaks.length;
+
+  const filtered = enriched.filter((s) =>
+    tab === "done" ? s._checkedToday : !s._checkedToday
+  );
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center" style={{ background: "#0d0d0d" }}>
+      <p className="font-mono text-white/20 text-xs tracking-widest animate-pulse">LOADING...</p>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen" style={{ background: "#0d0d0d", fontFamily: "'DM Mono', monospace" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap');
+        * { font-family: 'DM Mono', monospace; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+        option { background: #111; color: white; }
+      `}</style>
+
+      <div className="max-w-2xl mx-auto px-6 py-10">
+
+        {/* Page Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Flame size={14} className="text-[#c8f04c]" />
+              <span className="font-mono text-[11px] tracking-widest text-white/30 uppercase">
+                Chalk / Streaks
+              </span>
+            </div>
+            <h1 className="text-2xl font-mono text-white">
+              Streaks
+              <span className="ml-2 text-sm" style={{ color: "#c8f04c" }}>
+                {totalCount}
+              </span>
+            </h1>
+          </div>
+          <button
+            onClick={() => { setEditingStreak(null); setShowModal(true); }}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs tracking-widest transition-all hover:opacity-90 active:scale-95"
+            style={{ background: "#c8f04c", color: "#0d0d0d", fontWeight: "500", cursor: "pointer" }}
+          >
+            <Plus size={13} />
+            NEW STREAK
+          </button>
+        </div>
+
+        {/* Tabs */}
+        {totalCount > 0 && (
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: "#111" }}>
+              <button
+                onClick={() => setTab("active")}
+                className="px-4 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all"
+                style={{
+                  background: tab === "active" ? "#c8f04c" : "transparent",
+                  color: tab === "active" ? "#0d0d0d" : "rgba(255,255,255,0.3)",
+                  cursor: "pointer",
+                }}
+              >
+                PENDING
+              </button>
+              <button
+                onClick={() => setTab("done")}
+                className="px-4 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all"
+                style={{
+                  background: tab === "done" ? "#c8f04c" : "transparent",
+                  color: tab === "done" ? "#0d0d0d" : "rgba(255,255,255,0.3)",
+                  cursor: "pointer",
+                }}
+              >
+                DONE TODAY
+              </button>
+            </div>
+
+            {/* Daily progress */}
+            <div className="font-mono text-[10px] tracking-widest text-white/25">
+              {doneCount} / {totalCount} CHECKED IN
+            </div>
+          </div>
+        )}
+
+        {/* Error banner */}
+        {pageError && (
+          <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 mb-4">
+            <AlertTriangle size={13} className="text-red-400 shrink-0" />
+            <span className="font-mono text-xs text-red-400 flex-1">{pageError}</span>
+            <button onClick={() => setPageError("")} className="text-red-400/60 hover:text-red-400 transition-colors">
+              <X size={13} />
+            </button>
+          </div>
+        )}
+
+        {/* Streak list */}
+        {totalCount === 0 ? (
+          <div className="text-center py-24">
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/8"
+              style={{ background: "#111" }}
+            >
+              <Flame size={22} className="text-white/20" />
+            </div>
+            <p className="font-mono text-white/30 text-sm mb-1">No streaks yet</p>
+            <p className="font-mono text-white/15 text-xs mb-6">Start building daily habits</p>
+            <button
+              onClick={() => { setEditingStreak(null); setShowModal(true); }}
+              className="px-5 py-2.5 rounded-xl font-mono text-xs tracking-widest"
+              style={{ background: "#c8f04c", color: "#0d0d0d", cursor: "pointer" }}
+            >
+              GET STARTED
+            </button>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-24">
+            <p className="font-mono text-white/20 text-xs tracking-widest mb-2">
+              {tab === "done" ? "NOTHING CHECKED IN YET TODAY" : "ALL DONE FOR TODAY!"}
+            </p>
+            <p className="font-mono text-white/40 text-sm">
+              {tab === "done" ? '"Small steps, every day."' : '"Consistency is everything."'}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filtered.map((streak) => (
+              <StreakCard
+                key={streak.id}
+                streak={streak}
+                onCheckIn={handleCheckIn}
+                onEdit={(s) => { setEditingStreak(s); setShowModal(true); }}
+                onDelete={handleDelete}
+                checkingIn={checkingIn}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Shield info footer */}
+        {totalCount > 0 && (
+          <div className="mt-6 flex items-center gap-2 px-4 py-3 rounded-xl border border-blue-400/15 bg-blue-400/5">
+            <Shield size={13} className="text-blue-400 shrink-0" />
+            <span className="font-mono text-[10px] text-white/30 tracking-wide">
+              Shields absorb missed days — 3 per month, recharge on the 1st.
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Modal */}
+      {showModal && (
+        <StreakModal
+          streak={editingStreak}
+          onClose={() => { setShowModal(false); setEditingStreak(null); }}
+          onSave={() => { setShowModal(false); setEditingStreak(null); load(); }}
+        />
+      )}
+    </div>
+  );
+}
