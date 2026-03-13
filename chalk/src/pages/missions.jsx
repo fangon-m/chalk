@@ -61,7 +61,7 @@ function PriorityBadge({ priority }) {
 
 // ── Add/Edit/Delete Modal ────────────────────────────────────────────────────────────
 
-function MissionModal({ mission, onClose, onSave, streaks }) {
+function MissionModal({ mission, onClose, onSave, streaks, missions }) {
   const isEdit = !!mission?.id;
   const [form, setForm] = useState(
     mission || {
@@ -75,7 +75,8 @@ function MissionModal({ mission, onClose, onSave, streaks }) {
     }
   );
   const [dateError, setDateError] = useState("");
-
+  const [titleError, setTitleError] = useState("");
+  
   const toggle = (key, val) =>
     setForm((f) => ({
       ...f,
@@ -143,10 +144,20 @@ function MissionModal({ mission, onClose, onSave, streaks }) {
             </label>
             <input
               value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              onChange={(e) => {
+                const val = e.target.value;
+                setForm({ ...form, title: val });
+                const duplicate = missions.some(
+                  (m) => m.title.toLowerCase() === val.toLowerCase() && m.id !== mission?.id
+                );
+                setTitleError(duplicate ? "A mission with this title already exists" : "");
+              }}
               placeholder="What are you pursuing?"
               className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors"
             />
+            {titleError && (
+              <p className="font-mono text-[10px] text-red-400 mt-1">{titleError}</p>
+            )}
           </div>
 
           {/* Description */}
@@ -191,16 +202,11 @@ function MissionModal({ mission, onClose, onSave, streaks }) {
                 type="date"
                 value={form.timeline}
                 onChange={(e) => {
-                const val = e.target.value;
-                const today = new Date().toISOString().split("T")[0];
-                if (val && val < today) {
-                  setDateError("Target date can't be in the past");
-                  setForm({ ...form, timeline: "" });
-                } else {
-                  setDateError("");
+                  const val = e.target.value;
+                  const today = new Date().toISOString().split("T")[0];
                   setForm({ ...form, timeline: val });
-                }
-              }}
+                  setDateError(val && val < today ? "Target date can't be in the past" : "");
+                }}
                  min={new Date().toISOString().split("T")[0]}
                 className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors"
               />
@@ -250,6 +256,7 @@ function MissionModal({ mission, onClose, onSave, streaks }) {
           </div>
 
           {/* Connect Streaks */}
+          {streaks.length > 0 && (
           <div>
             <label className="block font-mono text-[10px] tracking-widest text-white/40 uppercase mb-2">
               Connect Streaks
@@ -274,7 +281,9 @@ function MissionModal({ mission, onClose, onSave, streaks }) {
               })}
             </div>
           </div>
+          )}
         </div>
+              
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-white/8 flex justify-end gap-3">
@@ -286,7 +295,7 @@ function MissionModal({ mission, onClose, onSave, streaks }) {
           </button>
           <button
             onClick={() => onSave(form)}
-            disabled={!form.title.trim() || !form.timeline}
+            disabled={!form.title.trim() || !form.timeline || !!titleError || !!dateError}
             className="px-5 py-2 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             style={{
               background: form.title.trim() ? "#c8f04c" : "#444",
@@ -873,6 +882,7 @@ export default function Missions() {
         <MissionModal
           mission={editingMission}
           streaks={streaks}
+          missions={missions}
           onClose={() => { setModalOpen(false); setEditingMission(null); }}
           onSave={handleSave}
         />
