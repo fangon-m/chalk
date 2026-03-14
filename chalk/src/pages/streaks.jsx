@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  Flame, Plus, Shield, CheckCircle2, Circle, Pencil, Trash2,
+  Flame, Plus, Shield, CheckCircle2, Check, Pencil, Trash2,
   ChevronDown, ChevronUp, X, Loader2, AlertTriangle, Zap,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
@@ -157,7 +157,7 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
               disabled={checkedToday || checkingIn === streak.id}
               className="shrink-0 w-8 h-8 rounded-lg border flex items-center justify-center transition-all"
               style={{
-                background: checkedToday ? `${accentColor}22` : "rgba(255,255,255,0.05)",
+                background: checkedToday ? `${accentColor}22` : "rgba(255,255,255,0.08)",
                 borderColor: checkedToday ? accentColor : "rgba(255,255,255,0.1)",
                 cursor: checkedToday ? "default" : "pointer",
               }}
@@ -167,7 +167,7 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
               ) : checkedToday ? (
                 <CheckCircle2 size={14} style={{ color: accentColor }} />
               ) : (
-                <Circle size={14} className="text-white/30" />
+                <Check size={13} className="text-white/35" />
               )}
             </button>
 
@@ -562,7 +562,7 @@ export default function Streaks() {
               {tab === "done" ? "NOTHING CHECKED IN YET TODAY" : "ALL DONE FOR TODAY!"}
             </p>
             <p className="font-mono text-white/40 text-sm">
-              {tab === "done" ? '"Small steps, every day."' : '"Consistency is everything."'}
+              {tab === "done" ? '"Small steps, every day."' : '"Give yourself some credit!"'}
             </p>
           </div>
         ) : (
@@ -585,7 +585,7 @@ export default function Streaks() {
           <div className="mt-6 flex items-center gap-2 px-4 py-3 rounded-xl border border-blue-400/15 bg-blue-400/5">
             <Shield size={13} className="text-blue-400 shrink-0" />
             <span className="font-mono text-[10px] text-white/30 tracking-wide">
-              Shields absorb missed days — 3 per month, recharge on the 1st.
+              Shields protect your streaks from missed days.
             </span>
           </div>
         )}

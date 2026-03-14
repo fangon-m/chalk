@@ -45,7 +45,7 @@ function PriorityBadge({ priority }) {
 
 // ── Streak Dropdown (searchable checkboxes) ───────────────────────────────────
 
-function StreakDropdown({ streaks: initialStreaks, selected = [], onChange, placeholder = "Connect streaks..." }) {
+function StreakDropdown({ streaks: initialStreaks, selected = [], onChange, placeholder = "Connect streaks...", onStreakCreated }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [streaks, setStreaks] = useState(initialStreaks);
@@ -84,13 +84,21 @@ function StreakDropdown({ streaks: initialStreaks, selected = [], onChange, plac
 
   async function handleCreateStreak() {
     if (!newName.trim()) return;
+    // Check for duplicate name (case-insensitive)
+    const duplicate = streaks.some((s) => s.name.toLowerCase() === newName.trim().toLowerCase());
+    if (duplicate) {
+      setSaveError("A streak with this name already exists");
+      return;
+    }
     setSaving(true);
     setSaveError("");
     try {
       const created = await createStreak({ name: newName.trim(), description: newDesc.trim() });
-      // Add to local list and auto-select it
+      // Update local dropdown list and auto-select
       setStreaks((prev) => [...prev, created]);
       onChange([...selected, created.id]);
+      // Notify parent so its streaks list stays in sync (for roadmap etc.)
+      onStreakCreated?.(created);
       setNewName("");
       setNewDesc("");
       setAddingNew(false);
@@ -148,7 +156,7 @@ function StreakDropdown({ streaks: initialStreaks, selected = [], onChange, plac
                     key={s.id}
                     type="button"
                     onClick={() => toggle(s.id)}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors text-left"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors text-left cursor-pointer"
                   >
                     <div
                       className="w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all"
@@ -193,7 +201,7 @@ function StreakDropdown({ streaks: initialStreaks, selected = [], onChange, plac
                 <button
                   type="button"
                   onClick={() => { setAddingNew(false); setNewName(""); setNewDesc(""); setSaveError(""); }}
-                  className="flex-1 px-3 py-1.5 rounded-lg border border-white/10 font-mono text-[10px] tracking-widest text-white/40 hover:text-white/60 transition-colors"
+                  className="flex-1 px-3 py-1.5 rounded-lg border border-white/10 font-mono text-[10px] tracking-widest text-white/40 hover:text-white/60 transition-colors cursor-pointer"
                 >
                   CANCEL
                 </button>
@@ -201,7 +209,7 @@ function StreakDropdown({ streaks: initialStreaks, selected = [], onChange, plac
                   type="button"
                   onClick={handleCreateStreak}
                   disabled={saving || !newName.trim()}
-                  className="flex-2 px-3 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all disabled:opacity-40 flex items-center justify-center gap-1.5"
+                  className="flex-2 px-3 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all disabled:opacity-40 flex items-center justify-center gap-1.5 cursor-pointer"
                   style={{ background: "#c8f04c", color: "#0d0d0d", flex: 2 }}
                 >
                   {saving ? <Loader size={10} className="animate-spin" /> : <Check size={10} strokeWidth={3} />}
@@ -241,7 +249,7 @@ function StreakDropdown({ streaks: initialStreaks, selected = [], onChange, plac
 
 // ── Add/Edit Modal ────────────────────────────────────────────────────────────
 
-function MissionModal({ mission, onClose, onSave, streaks, missions }) {
+function MissionModal({ mission, onClose, onSave, streaks, missions, onStreakCreated }) {
   const isEdit = !!mission?.id;
   const [form, setForm] = useState(() => {
     if (!mission) return { title: "", description: "", priority: 3, timeline: "", milestones: [], progress: 0 };
@@ -327,7 +335,7 @@ function MissionModal({ mission, onClose, onSave, streaks, missions }) {
               <select
                 value={form.priority}
                 onChange={(e) => setForm({ ...form, priority: Number(e.target.value) })}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors cursor-pointer"
               >
                 <option value={1}>High</option>
                 <option value={2}>Medium</option>
@@ -346,7 +354,7 @@ function MissionModal({ mission, onClose, onSave, streaks, missions }) {
                   setDateError(val && val < today ? "Target date can't be in the past" : "");
                 }}
                 min={new Date().toISOString().split("T")[0]}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors cursor-pointer"
               />
               {dateError && <p className="font-mono text-[10px] text-red-400 mt-1">{dateError}</p>}
             </div>
@@ -356,7 +364,7 @@ function MissionModal({ mission, onClose, onSave, streaks, missions }) {
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="font-mono text-[10px] tracking-widest text-white/40 uppercase">Milestones</label>
-              <button onClick={addMilestone} className="font-mono text-[10px] text-[#c8f04c]/70 hover:text-[#c8f04c] tracking-widest transition-colors flex items-center gap-1">
+              <button onClick={addMilestone} className="font-mono text-[10px] text-[#c8f04c]/70 hover:text-[#c8f04c] tracking-widest transition-colors flex items-center gap-1 cursor-pointer">
                 <Plus size={10} /> ADD
               </button>
             </div>
@@ -371,7 +379,7 @@ function MissionModal({ mission, onClose, onSave, streaks, missions }) {
                       placeholder={`Milestone ${idx + 1}`}
                       className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 font-mono focus:outline-none focus:border-[#c8f04c]/40 transition-colors"
                     />
-                    <button onClick={() => removeMilestone(idx)} className="text-white/20 hover:text-red-400 transition-colors shrink-0">
+                    <button onClick={() => removeMilestone(idx)} className="text-white/20 hover:text-red-400 transition-colors shrink-0 cursor-pointer">
                       <X size={12} />
                     </button>
                   </div>
@@ -385,6 +393,7 @@ function MissionModal({ mission, onClose, onSave, streaks, missions }) {
                         selected={ms.connectedStreaks || []}
                         onChange={(ids) => updateMilestoneStreaks(idx, ids)}
                         placeholder="Link streaks to this milestone..."
+                        onStreakCreated={onStreakCreated}
                       />
                     </div>
                   )}
@@ -449,17 +458,30 @@ function RoadmapView({ mission, onBack, onUpdate, allStreaks }) {
     const ml = milestones[mlIdx];
     const connectedIds = getConnectedIds(ml);
     const isConnected = connectedIds.includes(streakId);
+
+    // Optimistically update local milestones state so checkbox reflects immediately
+    const updatedMilestones = milestones.map((m, i) => {
+      if (i !== mlIdx) return m;
+      const currentLinks = m.milestone_streaks || [];
+      const updatedLinks = isConnected
+        ? currentLinks.filter((ms) => ms.streaks?.id !== streakId)
+        : [...currentLinks, { streaks: allStreaks.find((s) => s.id === streakId) }];
+      return { ...m, milestone_streaks: updatedLinks };
+    });
+    setMilestones(updatedMilestones);
+
     try {
       if (isConnected) {
-        // missions.js signature: disconnectStreakFromMilestone(milestoneId, streakId)
         await disconnectStreakFromMilestone(ml.id, streakId);
       } else {
-        // missions.js signature: connectStreakToMilestone(milestoneId, streakId)
         await connectStreakToMilestone(ml.id, streakId);
       }
-      onUpdate({ ...mission, milestones });
+      // Refresh parent to get clean DB state
+      onUpdate({ ...mission, milestones: updatedMilestones });
     } catch (err) {
       console.error(err);
+      // Revert on error
+      setMilestones(milestones);
     }
   };
 
@@ -527,7 +549,7 @@ function RoadmapView({ mission, onBack, onUpdate, allStreaks }) {
                       {allStreaks.length > 0 && (
                         <button
                           onClick={() => { setConnectingIdx(isOpen ? null : mlIdx); setSearchQuery(""); }}
-                          className={`ml-auto flex items-center gap-1 font-mono text-[9px] tracking-widest transition-colors px-2 py-1 rounded-lg border ${
+                          className={`ml-auto flex items-center gap-1 font-mono text-[9px] tracking-widest transition-colors px-2 py-1 rounded-lg border cursor-pointer ${
                             isOpen
                               ? "border-[#c8f04c]/40 text-[#c8f04c] bg-[#c8f04c]/10"
                               : "border-white/10 text-white/30 hover:text-white/60 hover:border-white/20"
@@ -566,7 +588,7 @@ function RoadmapView({ mission, onBack, onUpdate, allStreaks }) {
                                   key={s.id}
                                   type="button"
                                   onClick={() => handleStreakToggle(mlIdx, s.id)}
-                                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors text-left"
+                                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors text-left cursor-pointer"
                                 >
                                   <div
                                     className="w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all"
@@ -846,7 +868,7 @@ export default function Missions() {
               </div>
               <button
                 onClick={() => { setEditingMission(null); setModalOpen(true); }}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs tracking-widest transition-all hover:opacity-90 active:scale-95"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs tracking-widest transition-all hover:opacity-90 active:scale-95 cursor-pointer"
                 style={{ background: "#c8f04c", color: "#0d0d0d", fontWeight: "500", cursor: "pointer" }}
               >
                 <Plus size={13} /> NEW MISSION
@@ -928,6 +950,7 @@ export default function Missions() {
           missions={missions}
           onClose={() => { setModalOpen(false); setEditingMission(null); }}
           onSave={handleSave}
+          onStreakCreated={(newStreak) => setStreaks((prev) => [...prev, newStreak])}
         />
       )}
     </div>
