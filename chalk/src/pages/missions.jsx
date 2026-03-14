@@ -1,14 +1,14 @@
 import { useState, useRef, useEffect } from "react";
 import {
   Plus, Target, ChevronRight, ChevronDown, GripVertical, Flame,
-  Calendar, X, Milestone, ArrowLeft, Pencil, Trash2, Search, Check, Link2,
+  Calendar, X, Milestone, ArrowLeft, Pencil, Trash2, Search, Check, Link2, Loader2 as Loader,
 } from "lucide-react";
 import {
   getMissions, createMission, updateMission, deleteMission,
   updateMissionPriorities, toggleMilestone as toggleMilestone_db,
   connectStreakToMilestone, disconnectStreakFromMilestone,
 } from "../lib/missions";
-import { getStreaks } from "../lib/streaks";
+import { getStreaks, createStreak } from "../lib/streaks";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -45,14 +45,29 @@ function PriorityBadge({ priority }) {
 
 // ── Streak Dropdown (searchable checkboxes) ───────────────────────────────────
 
-function StreakDropdown({ streaks, selected = [], onChange, placeholder = "Connect streaks..." }) {
+function StreakDropdown({ streaks: initialStreaks, selected = [], onChange, placeholder = "Connect streaks..." }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [streaks, setStreaks] = useState(initialStreaks);
+  const [addingNew, setAddingNew] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newDesc, setNewDesc] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const ref = useRef(null);
+
+  // Keep streaks in sync if parent updates
+  useEffect(() => { setStreaks(initialStreaks); }, [initialStreaks]);
 
   useEffect(() => {
     function handleClick(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false);
+        setAddingNew(false);
+        setNewName("");
+        setNewDesc("");
+        setSaveError("");
+      }
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
@@ -66,6 +81,26 @@ function StreakDropdown({ streaks, selected = [], onChange, placeholder = "Conne
     onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
 
   const selectedStreaks = streaks.filter((s) => selected.includes(s.id));
+
+  async function handleCreateStreak() {
+    if (!newName.trim()) return;
+    setSaving(true);
+    setSaveError("");
+    try {
+      const created = await createStreak({ name: newName.trim(), description: newDesc.trim() });
+      // Add to local list and auto-select it
+      setStreaks((prev) => [...prev, created]);
+      onChange([...selected, created.id]);
+      setNewName("");
+      setNewDesc("");
+      setAddingNew(false);
+      setQuery("");
+    } catch (e) {
+      setSaveError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div ref={ref} className="relative">
@@ -82,6 +117,7 @@ function StreakDropdown({ streaks, selected = [], onChange, placeholder = "Conne
 
       {open && (
         <div className="absolute z-50 mt-1.5 w-full rounded-xl border border-white/10 overflow-hidden shadow-2xl" style={{ background: "#1a1a1a" }}>
+          {/* Search bar */}
           <div className="flex items-center gap-2 px-3 py-2.5 border-b border-white/8">
             <Search size={12} className="text-white/30 shrink-0" />
             <input
@@ -98,9 +134,12 @@ function StreakDropdown({ streaks, selected = [], onChange, placeholder = "Conne
             )}
           </div>
 
-          <div className="max-h-44 overflow-y-auto py-1">
-            {filtered.length === 0 ? (
-              <p className="px-4 py-3 font-mono text-[10px] text-white/25 text-center">No streaks found</p>
+          {/* Streak list */}
+          <div className="max-h-40 overflow-y-auto py-1">
+            {filtered.length === 0 && !addingNew ? (
+              <p className="px-4 py-3 font-mono text-[10px] text-white/25 text-center">
+                {query ? `No results for "${query}"` : "No streaks yet"}
+              </p>
             ) : (
               filtered.map((s) => {
                 const checked = selected.includes(s.id);
@@ -131,14 +170,69 @@ function StreakDropdown({ streaks, selected = [], onChange, placeholder = "Conne
             )}
           </div>
 
-          {selected.length > 0 && (
-            <div className="px-4 py-2 border-t border-white/8 flex items-center justify-between">
-              <span className="font-mono text-[10px] text-white/30">{selected.length} selected</span>
-              <button onClick={() => onChange([])} className="font-mono text-[10px] text-white/30 hover:text-red-400 transition-colors">
-                Clear all
-              </button>
+          {/* Inline new streak form */}
+          {addingNew && (
+            <div className="px-3 py-3 border-t border-white/8 space-y-2">
+              <input
+                autoFocus
+                value={newName}
+                onChange={(e) => { setNewName(e.target.value); setSaveError(""); }}
+                onKeyDown={(e) => { if (e.key === "Enter") handleCreateStreak(); if (e.key === "Escape") setAddingNew(false); }}
+                placeholder="Streak name"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-white/25 font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors"
+              />
+              <input
+                value={newDesc}
+                onChange={(e) => setNewDesc(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleCreateStreak(); if (e.key === "Escape") setAddingNew(false); }}
+                placeholder="Description (optional)"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-white/25 font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors"
+              />
+              {saveError && <p className="font-mono text-[10px] text-red-400">{saveError}</p>}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setAddingNew(false); setNewName(""); setNewDesc(""); setSaveError(""); }}
+                  className="flex-1 px-3 py-1.5 rounded-lg border border-white/10 font-mono text-[10px] tracking-widest text-white/40 hover:text-white/60 transition-colors"
+                >
+                  CANCEL
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateStreak}
+                  disabled={saving || !newName.trim()}
+                  className="flex-2 px-3 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all disabled:opacity-40 flex items-center justify-center gap-1.5"
+                  style={{ background: "#c8f04c", color: "#0d0d0d", flex: 2 }}
+                >
+                  {saving ? <Loader size={10} className="animate-spin" /> : <Check size={10} strokeWidth={3} />}
+                  CREATE & SELECT
+                </button>
+              </div>
             </div>
           )}
+
+          {/* Footer: selected count + add new button */}
+          <div className="px-4 py-2 border-t border-white/8 flex items-center justify-between">
+            <span className="font-mono text-[10px] text-white/25">
+              {selected.length > 0 ? `${selected.length} selected` : ""}
+            </span>
+            <div className="flex items-center gap-3">
+              {selected.length > 0 && (
+                <button onClick={() => onChange([])} className="font-mono text-[10px] text-white/30 hover:text-red-400 transition-colors">
+                  Clear
+                </button>
+              )}
+              {!addingNew && (
+                <button
+                  type="button"
+                  onClick={() => { setAddingNew(true); setQuery(""); }}
+                  className="flex items-center gap-1 font-mono text-[10px] tracking-widest text-[#c8f04c]/70 hover:text-[#c8f04c] transition-colors"
+                >
+                  <Plus size={10} /> NEW STREAK
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -149,9 +243,16 @@ function StreakDropdown({ streaks, selected = [], onChange, placeholder = "Conne
 
 function MissionModal({ mission, onClose, onSave, streaks, missions }) {
   const isEdit = !!mission?.id;
-  const [form, setForm] = useState(
-    mission || { title: "", description: "", priority: 3, timeline: "", milestones: [], progress: 0 }
-  );
+  const [form, setForm] = useState(() => {
+    if (!mission) return { title: "", description: "", priority: 3, timeline: "", milestones: [], progress: 0 };
+    return {
+      ...mission,
+      milestones: (mission.milestones || []).map((m) => ({
+        ...m,
+        connectedStreaks: m.milestone_streaks?.map((ms) => ms.streak_id).filter(Boolean) || [],
+      })),
+    };
+  });
   const [dateError, setDateError] = useState("");
   const [titleError, setTitleError] = useState("");
 
@@ -638,6 +739,25 @@ export default function Missions() {
     try {
       if (editingMission) {
         await updateMission(editingMission.id, form);
+
+        // Sync streak connections per milestone
+        for (const milestone of form.milestones) {
+          // Only process milestones that already exist in the DB (have a real UUID, not ml_timestamp)
+          if (!milestone.id || milestone.id.startsWith("ml_")) continue;
+
+          const newIds = milestone.connectedStreaks || [];
+          const oldIds = editingMission.milestones
+            .find((m) => m.id === milestone.id)
+            ?.milestone_streaks?.map((ms) => ms.streak_id) || [];
+
+          const toAdd = newIds.filter((id) => !oldIds.includes(id));
+          const toRemove = oldIds.filter((id) => !newIds.includes(id));
+
+          await Promise.all([
+            ...toAdd.map((streakId) => connectStreakToMilestone(milestone.id, streakId)),
+            ...toRemove.map((streakId) => disconnectStreakFromMilestone(milestone.id, streakId)),
+          ]);
+        }
       } else {
         await createMission(form);
       }

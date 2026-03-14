@@ -21,7 +21,6 @@ export async function createStreak(form) {
       user_id: user.id,
       name: form.name,
       description: form.description || null,
-      color: form.color || "#c8f04c",
       current_streak: 0,
       longest_streak: 0,
       shields: 3,
