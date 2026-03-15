@@ -147,10 +147,21 @@ export async function updateMission(id, form) {
 }
 
 // ── PROGRESS CALCULATION ──────────────────────────────────────────────────────
+//
+// Formula:
+//   • Newly created mission (age = 0 days) → always 0%
+//   • All milestones manually completed → 100%
+//   • Otherwise:
+//       time_score   (80%) = elapsed / total span between created_at and timeline
+//       streak_score (20%) = how consistently streaks have been maintained
+//                            SINCE the mission was created — a pre-existing
+//                            100-day streak contributes nothing on day 1;
+//                            only days that overlap with the mission's lifetime count
+//       milestone_boost    = if some milestones are manually done, take the
+//                            MAX of formula vs milestone ratio so manual
+//                            completions always move the bar forward
 
 export async function recalculateMissionProgress(missionId) {
-  console.log("[progress] recalculate called for:", missionId);
-
   const { data: mission, error } = await supabase
     .from("missions")
     .select(`
@@ -168,32 +179,31 @@ export async function recalculateMissionProgress(missionId) {
     .eq("id", missionId)
     .single();
 
-  if (error) {
-    console.error("[progress] fetch error:", error);
-    throw error;
-  }
-
-  console.log("[progress] mission fetched:", {
-    id: mission.id,
-    created_at: mission.created_at,
-    timeline: mission.timeline,
-    milestones_count: mission.milestones?.length,
-  });
+  if (error) throw error;
 
   const milestones = mission.milestones || [];
   const total = milestones.length;
 
+  // No milestones → 0%
   if (total === 0) {
-    console.log("[progress] early exit: no milestones → 0%");
+    await supabase.from("missions").update({ progress: 0 }).eq("id", missionId);
+    return 0;
+  }
+
+  const missionCreatedAt = new Date(mission.created_at).getTime();
+  const now = Date.now();
+  const missionAgeDays = Math.floor((now - missionCreatedAt) / 86400000);
+
+  // Newly created (same day) → always 0%, regardless of streaks or time
+  if (missionAgeDays === 0) {
     await supabase.from("missions").update({ progress: 0 }).eq("id", missionId);
     return 0;
   }
 
   const doneCount = milestones.filter((m) => m.completed).length;
-  console.log("[progress] doneCount:", doneCount, "/ total:", total);
 
+  // All milestones manually completed → 100%
   if (doneCount === total) {
-    console.log("[progress] early exit: all milestones done → 100%");
     await supabase.from("missions").update({ progress: 100 }).eq("id", missionId);
     return 100;
   }
@@ -201,58 +211,43 @@ export async function recalculateMissionProgress(missionId) {
   // ── Time score (80%) ────────────────────────────────────────────────────────
   let timeScore = 0;
   if (mission.timeline) {
-    const start = new Date(mission.created_at).getTime();
+    const start = missionCreatedAt;
     const end   = new Date(mission.timeline).getTime();
-    const now   = Date.now();
     const span  = end - start;
-
-    console.log("[progress] time calc:", {
-      created_at: mission.created_at,
-      timeline: mission.timeline,
-      start: new Date(start).toISOString(),
-      end: new Date(end).toISOString(),
-      span_days: Math.round(span / 86400000),
-      elapsed_days: Math.round((now - start) / 86400000),
-    });
-
     if (span > 0) {
       timeScore = Math.min(1, Math.max(0, (now - start) / span));
     }
-    console.log("[progress] timeScore:", timeScore.toFixed(3));
-  } else {
-    console.log("[progress] no timeline set — timeScore stays 0");
   }
 
   // ── Streak score (20%) ──────────────────────────────────────────────────────
+  // Only count streak days that fall within the mission's lifetime.
+  // A streak of N days means the user checked in the last N consecutive days.
+  // effectiveDays = how many of those N days overlap with the mission's age.
+  // This ensures a pre-existing 100-day streak contributes 0 on day 1,
+  // and only earns full credit once the mission has been active long enough.
   const allStreaks = milestones.flatMap((m) =>
     (m.milestone_streaks || []).map((ms) => ms.streaks).filter(Boolean)
   );
 
-  console.log("[progress] connected streaks found:", allStreaks.length);
-
   let streakScore = 0;
   if (allStreaks.length > 0) {
     const ratios = allStreaks.map((s) => {
-      if (!s.longest_streak || s.longest_streak === 0) {
-        return s.current_streak > 0 ? 1 : 0;
-      }
-      return Math.min(1, s.current_streak / s.longest_streak);
+      // Days of this streak that overlap with mission lifetime
+      const effectiveDays = Math.min(s.current_streak ?? 0, missionAgeDays);
+      // Ratio: how consistently has the user checked in since the mission started
+      return Math.min(1, effectiveDays / missionAgeDays);
     });
     streakScore = ratios.reduce((a, b) => a + b, 0) / ratios.length;
-    console.log("[progress] streak ratios:", ratios, "→ streakScore:", streakScore.toFixed(3));
   }
 
   // ── Combined ────────────────────────────────────────────────────────────────
   const formulaProgress = timeScore * 0.8 + streakScore * 0.2;
+
+  // Milestone ratio — manually ticking milestones always pushes progress forward
   const milestoneRatio = doneCount / total;
+
   const raw = Math.max(formulaProgress, milestoneRatio);
   const progress = Math.min(100, Math.round(raw * 100));
-
-  console.log("[progress] final:", {
-    formulaProgress: (formulaProgress * 100).toFixed(1) + "%",
-    milestoneRatio: (milestoneRatio * 100).toFixed(1) + "%",
-    final: progress + "%",
-  });
 
   await supabase
     .from("missions")
