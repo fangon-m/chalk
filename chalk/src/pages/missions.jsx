@@ -7,6 +7,7 @@ import {
   getMissions, createMission, updateMission, deleteMission,
   updateMissionPriorities, toggleMilestone as toggleMilestone_db,
   connectStreakToMilestone, disconnectStreakFromMilestone,
+  recalculateMissionProgress,
 } from "../lib/missions";
 import { getStreaks, createStreak } from "../lib/streaks";
 
@@ -56,7 +57,6 @@ function StreakDropdown({ streaks: initialStreaks, selected = [], onChange, plac
   const [saveError, setSaveError] = useState("");
   const ref = useRef(null);
 
-  // Keep streaks in sync if parent updates
   useEffect(() => { setStreaks(initialStreaks); }, [initialStreaks]);
 
   useEffect(() => {
@@ -84,7 +84,6 @@ function StreakDropdown({ streaks: initialStreaks, selected = [], onChange, plac
 
   async function handleCreateStreak() {
     if (!newName.trim()) return;
-    // Check for duplicate name (case-insensitive)
     const duplicate = streaks.some((s) => s.name.toLowerCase() === newName.trim().toLowerCase());
     if (duplicate) {
       setSaveError("A streak with this name already exists");
@@ -94,10 +93,8 @@ function StreakDropdown({ streaks: initialStreaks, selected = [], onChange, plac
     setSaveError("");
     try {
       const created = await createStreak({ name: newName.trim(), description: newDesc.trim() });
-      // Update local dropdown list and auto-select
       setStreaks((prev) => [...prev, created]);
       onChange([...selected, created.id]);
-      // Notify parent so its streaks list stays in sync (for roadmap etc.)
       onStreakCreated?.(created);
       setNewName("");
       setNewDesc("");
@@ -125,7 +122,6 @@ function StreakDropdown({ streaks: initialStreaks, selected = [], onChange, plac
 
       {open && (
         <div className="absolute z-50 mt-1.5 w-full rounded-xl border border-white/10 overflow-hidden shadow-2xl" style={{ background: "#1a1a1a" }}>
-          {/* Search bar */}
           <div className="flex items-center gap-2 px-3 py-2.5 border-b border-white/8">
             <Search size={12} className="text-white/30 shrink-0" />
             <input
@@ -142,7 +138,6 @@ function StreakDropdown({ streaks: initialStreaks, selected = [], onChange, plac
             )}
           </div>
 
-          {/* Streak list */}
           <div className="max-h-40 overflow-y-auto py-1">
             {filtered.length === 0 && !addingNew ? (
               <p className="px-4 py-3 font-mono text-[10px] text-white/25 text-center">
@@ -178,7 +173,6 @@ function StreakDropdown({ streaks: initialStreaks, selected = [], onChange, plac
             )}
           </div>
 
-          {/* Inline new streak form */}
           {addingNew && (
             <div className="px-3 py-3 border-t border-white/8 space-y-2">
               <input
@@ -219,7 +213,6 @@ function StreakDropdown({ streaks: initialStreaks, selected = [], onChange, plac
             </div>
           )}
 
-          {/* Footer: selected count + add new button */}
           <div className="px-4 py-2 border-t border-white/8 flex items-center justify-between">
             <span className="font-mono text-[10px] text-white/25">
               {selected.length > 0 ? `${selected.length} selected` : ""}
@@ -251,6 +244,7 @@ function StreakDropdown({ streaks: initialStreaks, selected = [], onChange, plac
 
 function MissionModal({ mission, onClose, onSave, streaks, missions, onStreakCreated }) {
   const isEdit = !!mission?.id;
+  const [submitted, setSubmitted] = useState(false);
   const [form, setForm] = useState(() => {
     if (!mission) return { title: "", description: "", priority: 3, timeline: "", milestones: [], progress: 0 };
     return {
@@ -263,6 +257,22 @@ function MissionModal({ mission, onClose, onSave, streaks, missions, onStreakCre
   });
   const [dateError, setDateError] = useState("");
   const [titleError, setTitleError] = useState("");
+
+  const hasAtLeastOneMilestone = form.milestones.length >= 1;
+  const hasAtLeastOneTitledMilestone = form.milestones.some((m) => m.title.trim().length > 0);
+  const milestoneError = !hasAtLeastOneMilestone
+    ? "Add at least 1 milestone to create a mission"
+    : !hasAtLeastOneTitledMilestone
+    ? "At least one milestone needs a title"
+    : "";
+
+  const canSubmit =
+    form.title.trim() &&
+    form.timeline &&
+    !titleError &&
+    !dateError &&
+    hasAtLeastOneMilestone &&
+    hasAtLeastOneTitledMilestone;
 
   const addMilestone = () =>
     setForm((f) => ({
@@ -286,6 +296,11 @@ function MissionModal({ mission, onClose, onSave, streaks, missions, onStreakCre
 
   const removeMilestone = (idx) =>
     setForm((f) => ({ ...f, milestones: f.milestones.filter((_, i) => i !== idx) }));
+
+  function handleSubmitClick() {
+    setSubmitted(true);
+    if (canSubmit) onSave(form);
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)" }}>
@@ -363,11 +378,30 @@ function MissionModal({ mission, onClose, onSave, streaks, missions, onStreakCre
           {/* Milestones */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="font-mono text-[10px] tracking-widest text-white/40 uppercase">Milestones</label>
-              <button onClick={addMilestone} className="font-mono text-[10px] text-[#c8f04c]/70 hover:text-[#c8f04c] tracking-widest transition-colors flex items-center gap-1 cursor-pointer">
+              <div className="flex items-center gap-2">
+                <label className="font-mono text-[10px] tracking-widest text-white/40 uppercase">
+                  Milestones
+                </label>
+                {/* REQUIRED only shows after a submit attempt with no milestones */}
+                {submitted && !hasAtLeastOneMilestone && (
+                  <span className="font-mono text-[9px] text-red-400/70 tracking-widest">REQUIRED</span>
+                )}
+              </div>
+              <button
+                onClick={addMilestone}
+                className="font-mono text-[10px] text-[#c8f04c]/70 hover:text-[#c8f04c] tracking-widest transition-colors flex items-center gap-1 cursor-pointer"
+              >
                 <Plus size={10} /> ADD
               </button>
             </div>
+
+            {/* Error banner — only after submit attempt */}
+            {submitted && milestoneError && form.milestones.length === 0 && (
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-red-400/20 bg-red-400/5 mb-3">
+                <span className="font-mono text-[10px] text-red-400/80">{milestoneError}</span>
+              </div>
+            )}
+
             <div className="space-y-3">
               {form.milestones.map((ms, idx) => (
                 <div key={ms.id} className="rounded-xl border border-white/8 p-3 space-y-2.5" style={{ background: "rgba(255,255,255,0.02)" }}>
@@ -379,7 +413,10 @@ function MissionModal({ mission, onClose, onSave, streaks, missions, onStreakCre
                       placeholder={`Milestone ${idx + 1}`}
                       className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 font-mono focus:outline-none focus:border-[#c8f04c]/40 transition-colors"
                     />
-                    <button onClick={() => removeMilestone(idx)} className="text-white/20 hover:text-red-400 transition-colors shrink-0 cursor-pointer">
+                    <button
+                      onClick={() => removeMilestone(idx)}
+                      className="text-white/20 hover:text-red-400 transition-colors shrink-0 cursor-pointer"
+                    >
                       <X size={12} />
                     </button>
                   </div>
@@ -399,22 +436,41 @@ function MissionModal({ mission, onClose, onSave, streaks, missions, onStreakCre
                   )}
                 </div>
               ))}
+
               {form.milestones.length === 0 && (
-                <p className="text-white/20 font-mono text-xs">No milestones yet</p>
+                <button
+                  onClick={addMilestone}
+                  className={`w-full py-4 rounded-xl border border-dashed transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    submitted && !hasAtLeastOneMilestone
+                      ? "border-red-400/30 bg-red-400/5 text-red-400/50 hover:border-red-400/50 hover:text-red-400/70"
+                      : "border-white/10 hover:border-[#c8f04c]/30 hover:bg-[#c8f04c]/5 text-white/25 hover:text-[#c8f04c]/60"
+                  }`}
+                >
+                  <Plus size={12} />
+                  <span className="font-mono text-[10px] tracking-widest">ADD FIRST MILESTONE</span>
+                </button>
               )}
             </div>
           </div>
         </div>
 
         <div className="px-6 py-4 border-t border-white/8 flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg border border-white/10 text-white/40 font-mono text-xs tracking-widest hover:text-white/60 transition-colors" style={{ cursor: "pointer" }}>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg border border-white/10 text-white/40 font-mono text-xs tracking-widest hover:text-white/60 transition-colors"
+            style={{ cursor: "pointer" }}
+          >
             CANCEL
           </button>
           <button
-            onClick={() => onSave(form)}
-            disabled={!form.title.trim() || !form.timeline || !!titleError || !!dateError}
-            className="px-5 py-2 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-            style={{ background: form.title.trim() ? "#c8f04c" : "#444", color: "#0d0d0d", cursor: "pointer" }}
+            onClick={handleSubmitClick}
+            className="px-5 py-2 rounded-lg font-mono text-xs tracking-widest transition-all"
+            style={{
+              background: canSubmit ? "#c8f04c" : submitted ? "rgba(239,68,68,0.15)" : "#444",
+              color: canSubmit ? "#0d0d0d" : submitted ? "#ef4444" : "rgba(255,255,255,0.3)",
+              border: submitted && !canSubmit ? "1px solid rgba(239,68,68,0.3)" : "1px solid transparent",
+              cursor: "pointer",
+            }}
           >
             {isEdit ? "SAVE CHANGES" : "CREATE MISSION"}
           </button>
@@ -430,6 +486,7 @@ function RoadmapView({ mission, onBack, onUpdate, allStreaks }) {
   const [milestones, setMilestones] = useState(mission.milestones || []);
   const [connectingIdx, setConnectingIdx] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [recalculating, setRecalculating] = useState(false);
 
   const toggleMilestone = async (mlIdx) => {
     const ml = milestones[mlIdx];
@@ -437,16 +494,22 @@ function RoadmapView({ mission, onBack, onUpdate, allStreaks }) {
     setMilestones(updated);
     try {
       await toggleMilestone_db(ml.id, !ml.completed);
-      onUpdate({ ...mission, milestones: updated });
+      setRecalculating(true);
+      const newProgress = await recalculateMissionProgress(mission.id);
+      setRecalculating(false);
+      onUpdate({ ...mission, milestones: updated, progress: newProgress });
     } catch (err) {
       console.error(err);
+      setRecalculating(false);
       setMilestones(milestones);
     }
   };
 
   const totalMilestones = milestones.length;
   const doneMilestones = milestones.filter((m) => m.completed).length;
-  const progress = totalMilestones > 0 ? Math.round((doneMilestones / totalMilestones) * 100) : mission.progress || 0;
+  const displayProgress = recalculating
+    ? (doneMilestones === totalMilestones && totalMilestones > 0 ? 100 : mission.progress)
+    : mission.progress;
 
   const getMilestoneStreaks = (ml) =>
     ml.milestone_streaks?.map((ms) => ms.streaks).filter(Boolean) || [];
@@ -459,7 +522,6 @@ function RoadmapView({ mission, onBack, onUpdate, allStreaks }) {
     const connectedIds = getConnectedIds(ml);
     const isConnected = connectedIds.includes(streakId);
 
-    // Optimistically update local milestones state so checkbox reflects immediately
     const updatedMilestones = milestones.map((m, i) => {
       if (i !== mlIdx) return m;
       const currentLinks = m.milestone_streaks || [];
@@ -476,11 +538,10 @@ function RoadmapView({ mission, onBack, onUpdate, allStreaks }) {
       } else {
         await connectStreakToMilestone(ml.id, streakId);
       }
-      // Refresh parent to get clean DB state
-      onUpdate({ ...mission, milestones: updatedMilestones });
+      const newProgress = await recalculateMissionProgress(mission.id);
+      onUpdate({ ...mission, milestones: updatedMilestones, progress: newProgress });
     } catch (err) {
       console.error(err);
-      // Revert on error
       setMilestones(milestones);
     }
   };
@@ -504,14 +565,32 @@ function RoadmapView({ mission, onBack, onUpdate, allStreaks }) {
           <PriorityBadge priority={mission.priority} />
         </div>
         <div className="flex items-center gap-3 mt-4">
-          <div className="flex-1"><ProgressBar value={progress} /></div>
-          <span className="font-mono text-xs text-[#c8f04c] tabular-nums">{progress}%</span>
+          <div className="flex-1"><ProgressBar value={displayProgress} /></div>
+          <span className="font-mono text-xs tabular-nums flex items-center gap-1.5" style={{ color: "#c8f04c" }}>
+            {recalculating && <Loader size={10} className="animate-spin opacity-60" />}
+            {displayProgress}%
+          </span>
           <div className="flex items-center gap-1 text-white/30">
             <Calendar size={12} />
             <span className="font-mono text-xs">
               {mission.timeline ? new Date(mission.timeline).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "No date"}
             </span>
           </div>
+        </div>
+
+        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-white/6">
+          <span className="font-mono text-[9px] tracking-widest text-white/35 uppercase">Progress formula:</span>
+          <span className="font-mono text-[9px] text-white/50">80% time-based</span>
+          <span className="text-white/50 text-[9px]">+</span>
+          <span className="font-mono text-[9px] text-white/50">20% streak consistency</span>
+          <span className="font-mono text-[9px] tracking-widest text-white/35 uppercase">OR:</span>
+          <span className="font-mono text-[9px] text-white/50">Complete milestones</span>
+          {doneMilestones > 0 && doneMilestones < totalMilestones && (
+            <>
+              <span className="text-white/10 text-[9px]">·</span>
+              <span className="font-mono text-[9px] text-[#c8f04c]/50">{doneMilestones}/{totalMilestones} milestones done</span>
+            </>
+          )}
         </div>
       </div>
 
@@ -561,7 +640,6 @@ function RoadmapView({ mission, onBack, onUpdate, allStreaks }) {
                       )}
                     </div>
 
-                    {/* Inline streak connector */}
                     {isOpen && (
                       <div className="mb-3 rounded-xl border border-white/8 overflow-hidden" style={{ background: "rgba(255,255,255,0.02)" }}>
                         <div className="flex items-center gap-2 px-3 py-2.5 border-b border-white/8">
@@ -686,7 +764,7 @@ function MissionCard({ mission, index, onSelect, onEdit, onDelete, dragging, onD
             </div>
             {mission.timeline && (
               <div className="flex items-center gap-1 text-white/25">
-                <Calendar size={11} />
+                <Calendar size={12} />
                 <span className="font-mono text-[10px]">
                   {new Date(mission.timeline).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
                 </span>
@@ -762,9 +840,7 @@ export default function Missions() {
       if (editingMission) {
         await updateMission(editingMission.id, form);
 
-        // Sync streak connections per milestone
         for (const milestone of form.milestones) {
-          // Only process milestones that already exist in the DB (have a real UUID, not ml_timestamp)
           if (!milestone.id || milestone.id.startsWith("ml_")) continue;
 
           const newIds = milestone.connectedStreaks || [];
@@ -780,6 +856,8 @@ export default function Missions() {
             ...toRemove.map((streakId) => disconnectStreakFromMilestone(milestone.id, streakId)),
           ]);
         }
+
+        await recalculateMissionProgress(editingMission.id);
       } else {
         await createMission(form);
       }

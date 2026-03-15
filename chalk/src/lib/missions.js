@@ -2,7 +2,6 @@ import { supabase } from "./supabase";
 
 // ── MISSIONS ──────────────────────────────────────────────────────────────────
 
-// Fetch all missions for the logged-in user, ordered by priority
 export async function getMissions() {
   const { data, error } = await supabase
     .from("missions")
@@ -22,7 +21,6 @@ export async function getMissions() {
   return data;
 }
 
-// Create a new mission
 export async function createMission(form) {
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -41,7 +39,6 @@ export async function createMission(form) {
 
   if (error) throw error;
 
-  // insert milestones if any
   if (form.milestones?.length > 0) {
     const milestonesWithMissionId = form.milestones.map((m, i) => ({
       mission_id: data.id,
@@ -57,7 +54,6 @@ export async function createMission(form) {
 
     if (mlError) throw mlError;
 
-    // connect streaks to milestones if any
     const streakLinks = [];
     form.milestones.forEach((m, i) => {
       if (m.connectedStreaks?.length > 0) {
@@ -81,9 +77,7 @@ export async function createMission(form) {
   return data;
 }
 
-// Update an existing mission
 export async function updateMission(id, form) {
-  // 1. Update the mission row itself
   const { data, error } = await supabase
     .from("missions")
     .update({
@@ -98,7 +92,7 @@ export async function updateMission(id, form) {
 
   if (error) throw error;
 
-  // 2. Update titles of existing milestones
+  // Update titles of existing milestones
   const existingMilestones = (form.milestones || []).filter(
     (m) => m.id && !m.id.startsWith("ml_")
   );
@@ -114,7 +108,7 @@ export async function updateMission(id, form) {
     );
   }
 
-  // 3. Insert brand-new milestones (temp IDs from modal start with "ml_")
+  // Insert brand-new milestones
   const newMilestones = (form.milestones || []).filter(
     (m) => !m.id || m.id.startsWith("ml_")
   );
@@ -134,7 +128,6 @@ export async function updateMission(id, form) {
 
     if (mlError) throw mlError;
 
-    // Connect any streaks attached to the new milestones
     const streakLinks = [];
     newMilestones.forEach((m, i) => {
       (m.connectedStreaks || []).forEach((streakId) => {
@@ -153,23 +146,122 @@ export async function updateMission(id, form) {
   return data;
 }
 
-// Update mission progress (calls the Postgres function)
-export async function refreshMissionProgress(missionId) {
-  const { data, error } = await supabase
-    .rpc("calculate_mission_progress", { mission_id: missionId });
+// ── PROGRESS CALCULATION ──────────────────────────────────────────────────────
 
-  if (error) throw error;
+export async function recalculateMissionProgress(missionId) {
+  console.log("[progress] recalculate called for:", missionId);
 
-  // write the result back to the mission row
+  const { data: mission, error } = await supabase
+    .from("missions")
+    .select(`
+      id,
+      created_at,
+      timeline,
+      milestones (
+        id,
+        completed,
+        milestone_streaks (
+          streaks ( current_streak, longest_streak )
+        )
+      )
+    `)
+    .eq("id", missionId)
+    .single();
+
+  if (error) {
+    console.error("[progress] fetch error:", error);
+    throw error;
+  }
+
+  console.log("[progress] mission fetched:", {
+    id: mission.id,
+    created_at: mission.created_at,
+    timeline: mission.timeline,
+    milestones_count: mission.milestones?.length,
+  });
+
+  const milestones = mission.milestones || [];
+  const total = milestones.length;
+
+  if (total === 0) {
+    console.log("[progress] early exit: no milestones → 0%");
+    await supabase.from("missions").update({ progress: 0 }).eq("id", missionId);
+    return 0;
+  }
+
+  const doneCount = milestones.filter((m) => m.completed).length;
+  console.log("[progress] doneCount:", doneCount, "/ total:", total);
+
+  if (doneCount === total) {
+    console.log("[progress] early exit: all milestones done → 100%");
+    await supabase.from("missions").update({ progress: 100 }).eq("id", missionId);
+    return 100;
+  }
+
+  // ── Time score (80%) ────────────────────────────────────────────────────────
+  let timeScore = 0;
+  if (mission.timeline) {
+    const start = new Date(mission.created_at).getTime();
+    const end   = new Date(mission.timeline).getTime();
+    const now   = Date.now();
+    const span  = end - start;
+
+    console.log("[progress] time calc:", {
+      created_at: mission.created_at,
+      timeline: mission.timeline,
+      start: new Date(start).toISOString(),
+      end: new Date(end).toISOString(),
+      span_days: Math.round(span / 86400000),
+      elapsed_days: Math.round((now - start) / 86400000),
+    });
+
+    if (span > 0) {
+      timeScore = Math.min(1, Math.max(0, (now - start) / span));
+    }
+    console.log("[progress] timeScore:", timeScore.toFixed(3));
+  } else {
+    console.log("[progress] no timeline set — timeScore stays 0");
+  }
+
+  // ── Streak score (20%) ──────────────────────────────────────────────────────
+  const allStreaks = milestones.flatMap((m) =>
+    (m.milestone_streaks || []).map((ms) => ms.streaks).filter(Boolean)
+  );
+
+  console.log("[progress] connected streaks found:", allStreaks.length);
+
+  let streakScore = 0;
+  if (allStreaks.length > 0) {
+    const ratios = allStreaks.map((s) => {
+      if (!s.longest_streak || s.longest_streak === 0) {
+        return s.current_streak > 0 ? 1 : 0;
+      }
+      return Math.min(1, s.current_streak / s.longest_streak);
+    });
+    streakScore = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+    console.log("[progress] streak ratios:", ratios, "→ streakScore:", streakScore.toFixed(3));
+  }
+
+  // ── Combined ────────────────────────────────────────────────────────────────
+  const formulaProgress = timeScore * 0.8 + streakScore * 0.2;
+  const milestoneRatio = doneCount / total;
+  const raw = Math.max(formulaProgress, milestoneRatio);
+  const progress = Math.min(100, Math.round(raw * 100));
+
+  console.log("[progress] final:", {
+    formulaProgress: (formulaProgress * 100).toFixed(1) + "%",
+    milestoneRatio: (milestoneRatio * 100).toFixed(1) + "%",
+    final: progress + "%",
+  });
+
   await supabase
     .from("missions")
-    .update({ progress: data })
+    .update({ progress })
     .eq("id", missionId);
 
-  return data;
+  return progress;
 }
 
-// Delete a mission (cascades to milestones + milestone_streaks)
 export async function deleteMission(id) {
   const { error } = await supabase
     .from("missions")
@@ -179,7 +271,6 @@ export async function deleteMission(id) {
   if (error) throw error;
 }
 
-// Reorder missions priorities after drag
 export async function updateMissionPriorities(missions) {
   const updates = missions.map((m, i) =>
     supabase
@@ -187,14 +278,12 @@ export async function updateMissionPriorities(missions) {
       .update({ priority: i + 1 })
       .eq("id", m.id)
   );
-
   await Promise.all(updates);
 }
 
 
 // ── MILESTONES ────────────────────────────────────────────────────────────────
 
-// Toggle milestone completed
 export async function toggleMilestone(id, completed) {
   const { error } = await supabase
     .from("milestones")
@@ -204,7 +293,6 @@ export async function toggleMilestone(id, completed) {
   if (error) throw error;
 }
 
-// Connect a streak to a milestone
 export async function connectStreakToMilestone(milestoneId, streakId) {
   const { error } = await supabase
     .from("milestone_streaks")
@@ -213,7 +301,6 @@ export async function connectStreakToMilestone(milestoneId, streakId) {
   if (error) throw error;
 }
 
-// Disconnect a streak from a milestone
 export async function disconnectStreakFromMilestone(milestoneId, streakId) {
   const { error } = await supabase
     .from("milestone_streaks")
