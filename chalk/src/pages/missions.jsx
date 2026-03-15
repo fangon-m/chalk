@@ -386,7 +386,7 @@ function MissionModal({ mission, onClose, onSave, streaks, missions, onStreakCre
                   {streaks.length > 0 && (
                     <div className="pl-5">
                       <label className="block font-mono text-[9px] tracking-widest text-white/25 uppercase mb-1.5">
-                        Connect Streaks
+                        Connect Streaks (Optional)
                       </label>
                       <StreakDropdown
                         streaks={streaks}
@@ -407,14 +407,14 @@ function MissionModal({ mission, onClose, onSave, streaks, missions, onStreakCre
         </div>
 
         <div className="px-6 py-4 border-t border-white/8 flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg border border-white/10 text-white/40 font-mono text-xs tracking-widest hover:text-white/60 transition-colors">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg border border-white/10 text-white/40 font-mono text-xs tracking-widest hover:text-white/60 transition-colors" style={{ cursor: "pointer" }}>
             CANCEL
           </button>
           <button
             onClick={() => onSave(form)}
             disabled={!form.title.trim() || !form.timeline || !!titleError || !!dateError}
             className="px-5 py-2 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-            style={{ background: form.title.trim() ? "#c8f04c" : "#444", color: "#0d0d0d" }}
+            style={{ background: form.title.trim() ? "#c8f04c" : "#444", color: "#0d0d0d", cursor: "pointer" }}
           >
             {isEdit ? "SAVE CHANGES" : "CREATE MISSION"}
           </button>

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Flame, Plus, Shield, CheckCircle2, Check, Pencil, Trash2,
   ChevronDown, ChevronUp, X, Loader2, AlertTriangle, Zap,
+  Target, Link2,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import {
@@ -26,6 +27,28 @@ function buildCalendarDots(logs = [], days = 28) {
     result.push({ date: key, checked: set.has(key), isToday: i === 0 });
   }
   return result;
+}
+
+// ── Flame color ───────────────────────────────────────────────────────────────
+
+function getFlameColor(count) {
+  if (count >= 50) return "#c8f04c";  // lime — legendary
+  if (count >= 21) return "#ef4444";  // red
+  if (count >= 11) return "#f97316";  // orange
+  if (count >= 3)  return "#eab308";  // yellow
+  return "#6b7280";                   // gray — 0–2
+}
+
+// ── Priority color ────────────────────────────────────────────────────────────
+
+function getPriorityColor(priority) {
+  switch (priority) {
+    case "critical": return "#ef4444";
+    case "high":     return "#f97316";
+    case "medium":   return "#eab308";
+    case "low":      return "#6b7280";
+    default:         return "#c8f04c";
+  }
 }
 
 // ── Calendar strip ────────────────────────────────────────────────────────────
@@ -73,6 +96,134 @@ function ShieldPips({ count = 0, max = 3 }) {
           }}
         />
       ))}
+    </div>
+  );
+}
+
+// ── Connected Missions Panel ──────────────────────────────────────────────────
+
+function ConnectedMissions({ streakId }) {
+  const [missions, setMissions] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchConnected() {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("milestone_streaks")
+          .select(`
+            milestone_id,
+            milestones (
+              id,
+              title,
+              missions (
+                id,
+                title,
+                priority,
+                progress
+              )
+            )
+          `)
+          .eq("streak_id", streakId);
+
+        if (error) throw error;
+
+        // Deduplicate missions (a streak can connect to multiple milestones
+        // of the same mission)
+        const missionMap = new Map();
+        for (const row of data || []) {
+          const m = row.milestones?.missions;
+          const milestone = row.milestones;
+          if (!m || !milestone) continue;
+          if (!missionMap.has(m.id)) {
+            missionMap.set(m.id, {
+              ...m,
+              milestones: [milestone.title],
+            });
+          } else {
+            missionMap.get(m.id).milestones.push(milestone.title);
+          }
+        }
+
+        setMissions([...missionMap.values()]);
+      } catch {
+        setMissions([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchConnected();
+  }, [streakId]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-white/20 pt-1">
+        <Loader2 size={11} className="animate-spin" />
+        <span className="font-mono text-[10px]">Loading...</span>
+      </div>
+    );
+  }
+
+  if (!missions || missions.length === 0) {
+    return (
+      <div className="flex items-center gap-2 pt-1">
+        <Link2 size={11} className="text-white/15" />
+        <span className="font-mono text-[10px] text-white/20 italic">
+          Not linked to any mission
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2 pt-1">
+      {missions.map((mission) => {
+        const color = getPriorityColor(mission.priority);
+        const progress = mission.progress ?? 0;
+        return (
+          <div
+            key={mission.id}
+            className="flex items-center gap-2.5 rounded-lg overflow-hidden"
+            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+          >
+            {/* Priority stripe */}
+            <div
+              className="w-0.5 self-stretch shrink-0"
+              style={{ background: color, minHeight: 36 }}
+            />
+
+            <div className="flex-1 min-w-0 py-2 pr-1">
+              <div
+                className="font-mono text-[11px] truncate"
+                style={{ color: "rgba(255,255,255,0.7)" }}
+              >
+                {mission.title}
+              </div>
+              <div className="font-mono text-[9px] text-white/25 truncate mt-0.5">
+                {mission.milestones.join(", ")}
+              </div>
+            </div>
+
+            {/* Progress */}
+            <div className="flex flex-col items-end gap-1 pr-2.5 py-2 shrink-0">
+              <span className="font-mono text-[10px]" style={{ color }}>
+                {Math.round(progress)}%
+              </span>
+              <div
+                className="w-12 h-0.5 rounded-full overflow-hidden"
+                style={{ background: "rgba(255,255,255,0.08)" }}
+              >
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${progress}%`, background: color }}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -221,7 +372,7 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1 text-white/25">
-              <Flame size={11} style={{ color: accentColor }} />
+              <Flame size={11} style={{ color: getFlameColor(streak.current_streak ?? 0) }} />
               <span className="font-mono text-[10px]">
                 {streak.current_streak ?? 0} day{streak.current_streak !== 1 ? "s" : ""}
               </span>
@@ -242,19 +393,41 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
           </button>
         </div>
 
-        {/* Expanded: 28-day calendar */}
+        {/* ── Expanded panel ── */}
         {expanded && (
           <div className="mt-3 pt-3 border-t border-white/8">
-            <span className="font-mono text-[10px] tracking-widest text-white/25 uppercase">
-              Last 28 Days
-            </span>
             {loadingLogs ? (
-              <div className="flex items-center gap-2 mt-2 text-white/25">
+              <div className="flex items-center gap-2 text-white/25">
                 <Loader2 size={12} className="animate-spin" />
                 <span className="font-mono text-[10px]">Loading...</span>
               </div>
             ) : (
-              <CalendarStrip logs={logs || []} />
+              <div className="flex gap-5">
+                {/* Left: 28-day calendar */}
+                <div className="shrink-0">
+                  <span className="font-mono text-[10px] tracking-widest text-white/25 uppercase">
+                    Last 28 Days
+                  </span>
+                  <CalendarStrip logs={logs || []} />
+                </div>
+
+                {/* Divider */}
+                <div
+                  className="w-px self-stretch shrink-0"
+                  style={{ background: "rgba(255,255,255,0.06)" }}
+                />
+
+                {/* Right: connected missions */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Target size={10} className="text-white/25" />
+                    <span className="font-mono text-[10px] tracking-widest text-white/25 uppercase">
+                      Connected Missions
+                    </span>
+                  </div>
+                  <ConnectedMissions streakId={streak.id} />
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -347,7 +520,6 @@ function StreakModal({ streak, onClose, onSave }) {
               className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors"
             />
           </div>
-
         </div>
 
         {/* Footer */}

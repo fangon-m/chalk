@@ -83,6 +83,7 @@ export async function createMission(form) {
 
 // Update an existing mission
 export async function updateMission(id, form) {
+  // 1. Update the mission row itself
   const { data, error } = await supabase
     .from("missions")
     .update({
@@ -96,6 +97,59 @@ export async function updateMission(id, form) {
     .single();
 
   if (error) throw error;
+
+  // 2. Update titles of existing milestones
+  const existingMilestones = (form.milestones || []).filter(
+    (m) => m.id && !m.id.startsWith("ml_")
+  );
+
+  if (existingMilestones.length > 0) {
+    await Promise.all(
+      existingMilestones.map((m) =>
+        supabase
+          .from("milestones")
+          .update({ title: m.title })
+          .eq("id", m.id)
+      )
+    );
+  }
+
+  // 3. Insert brand-new milestones (temp IDs from modal start with "ml_")
+  const newMilestones = (form.milestones || []).filter(
+    (m) => !m.id || m.id.startsWith("ml_")
+  );
+
+  if (newMilestones.length > 0) {
+    const { data: inserted, error: mlError } = await supabase
+      .from("milestones")
+      .insert(
+        newMilestones.map((m, i) => ({
+          mission_id: id,
+          title: m.title,
+          completed: false,
+          order: existingMilestones.length + i,
+        }))
+      )
+      .select();
+
+    if (mlError) throw mlError;
+
+    // Connect any streaks attached to the new milestones
+    const streakLinks = [];
+    newMilestones.forEach((m, i) => {
+      (m.connectedStreaks || []).forEach((streakId) => {
+        streakLinks.push({ milestone_id: inserted[i].id, streak_id: streakId });
+      });
+    });
+
+    if (streakLinks.length > 0) {
+      const { error: linkError } = await supabase
+        .from("milestone_streaks")
+        .insert(streakLinks);
+      if (linkError) throw linkError;
+    }
+  }
+
   return data;
 }
 
