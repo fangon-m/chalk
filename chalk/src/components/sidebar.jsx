@@ -31,6 +31,9 @@ export default function Sidebar() {
         justifyContent: "space-between",
         transition: "all 0.3s ease",
         overflow: "hidden",
+        position: "sticky",
+        top: 0,
+        height: "100dvh",
       }}>
     
       {/* Top section */}
