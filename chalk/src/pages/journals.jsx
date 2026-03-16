@@ -227,12 +227,15 @@ function JournalCard({ journal, onEdit, onDelete }) {
         <div className="flex items-center gap-2 text-white/20">
           <Clock size={10} />
           <span className="font-mono text-[10px]">{formatDate(journal.created_at)}</span>
-          <span className="text-white/10">·</span>
+          <span className="text-white/10"></span>
           <span className="font-mono text-[10px]">{formatTime(journal.created_at)}</span>
           {journal.updated_at !== journal.created_at && (
             <>
               <span className="text-white/10">·</span>
-              <span className="font-mono text-[10px] text-white/15">edited</span>
+              <Pencil size={8} />
+              <span className="font-mono text-[10px]">{formatDate(journal.updated_at)}</span>
+              <span className="text-white/10"></span>
+              <span className="font-mono text-[10px]">{formatTime(journal.updated_at)}</span>
             </>
           )}
         </div>
@@ -374,13 +377,6 @@ export default function Journals() {
             >
               "{quote}"
             </p>
-            <button
-              onClick={() => setEditing({})}
-              className="px-5 py-2.5 rounded-xl font-mono text-xs tracking-widest"
-              style={{ background: "#c8f04c", color: "#0d0d0d", cursor: "pointer" }}
-            >
-              WRITE YOUR FIRST ENTRY
-            </button>
           </div>
         ) : (
           <div className="space-y-3">

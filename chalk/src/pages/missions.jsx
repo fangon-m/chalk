@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import {
-  Plus, Target, ChevronRight, ChevronDown, GripVertical, Flame,
+  Plus, Map, ChevronRight, ChevronDown, GripVertical, Flame,
   Calendar, X, Milestone, ArrowLeft, Pencil, Trash2, Search, Check, Link2, Loader2 as Loader,
 } from "lucide-react";
 import {
@@ -936,7 +936,7 @@ export default function Missions() {
             <div className="flex items-center justify-between mb-8">
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <Target size={14} className="text-[#c8f04c]" />
+                  <Map size={14} className="text-[#c8f04c]" />
                   <span className="font-mono text-[11px] tracking-widest text-white/30 uppercase">Chalk / Missions</span>
                 </div>
                 <h1 className="text-2xl font-mono text-white">
