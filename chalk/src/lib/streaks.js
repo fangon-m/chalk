@@ -100,3 +100,13 @@ export async function disconnectStreakFromMilestone(milestoneId, streakId) {
 
   if (error) throw error;
 }
+
+// Returns all mission IDs that have this streak connected (via milestone_streaks)
+export async function getMissionIdsForStreak(streakId) {
+  const { data, error } = await supabase
+    .from("milestone_streaks")
+    .select("milestones(mission_id)")
+    .eq("streak_id", streakId);
+  if (error) return [];
+  return [...new Set(data.map((r) => r.milestones?.mission_id).filter(Boolean))];
+}

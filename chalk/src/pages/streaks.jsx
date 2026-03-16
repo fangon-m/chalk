@@ -10,6 +10,9 @@ import {
   checkInStreak, getStreakLogs,
 } from "../lib/streaks";
 
+import { recalculateMissionProgress } from "../lib/missions";
+import { getMissionIdsForStreak } from "../lib/streaks";
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function isCheckedInToday(logs = []) {
@@ -588,18 +591,25 @@ export default function Streaks() {
   useEffect(() => { load(); }, [load]);
 
   async function handleCheckIn(id) {
-    setCheckingIn(id);
-    try {
-      await checkInStreak(id);
-      setTodayMap((prev) => ({ ...prev, [id]: true }));
-      const fresh = await getStreaks();
-      setStreaks(fresh || []);
-    } catch (e) {
-      setPageError(e.message);
-    } finally {
-      setCheckingIn(null);
+  setCheckingIn(id);
+  try {
+    await checkInStreak(id);
+    setTodayMap((prev) => ({ ...prev, [id]: true }));
+    const fresh = await getStreaks();
+    setStreaks(fresh || []);
+
+    // ── Silently recalculate any connected missions in the background ──
+    const missionIds = await getMissionIdsForStreak(id);
+    if (missionIds.length > 0) {
+      Promise.all(missionIds.map((mid) => recalculateMissionProgress(mid)))
+        .catch(() => {}); // silent — don't block or error the UI
     }
+  } catch (e) {
+    setPageError(e.message);
+  } finally {
+    setCheckingIn(null);
   }
+}
 
   async function handleDelete(id) {
     try {
