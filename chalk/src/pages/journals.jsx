@@ -100,10 +100,15 @@ function SaveIndicator({ status }) {
 
 // ── Toolbar helpers ───────────────────────────────────────────────────────────
 
+// onMouseDown + preventDefault keeps editor focus/selection intact
 function ToolBtn({ onClick, active, title, children }) {
   return (
     <button
-      onMouseDown={(e) => { e.preventDefault(); onClick(); }}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onClick();
+      }}
       title={title}
       className="flex items-center justify-center rounded-md transition-all"
       style={{
@@ -122,11 +127,15 @@ function ToolDivider() {
   return <div style={{ width: 1, height: 18, background: "rgba(255,255,255,0.08)", margin: "0 2px", flexShrink: 0 }} />;
 }
 
-function FontSizeSelect({ value, onChange }) {
+// Refocus editor after select change so selection is retained
+function FontSizeSelect({ value, onChange, editor }) {
   return (
     <select
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e) => {
+        onChange(e.target.value);
+        setTimeout(() => editor?.commands.focus(), 0);
+      }}
       className="font-mono text-[11px] rounded-md px-1 focus:outline-none cursor-pointer"
       style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)", height: 28 }}
     >
@@ -135,11 +144,14 @@ function FontSizeSelect({ value, onChange }) {
   );
 }
 
-function FontSelect({ value, onChange }) {
+function FontSelect({ value, onChange, editor }) {
   return (
     <select
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e) => {
+        onChange(e.target.value);
+        setTimeout(() => editor?.commands.focus(), 0);
+      }}
       className="font-mono text-[11px] rounded-md px-1 focus:outline-none cursor-pointer"
       style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)", height: 28, maxWidth: 80 }}
     >
@@ -157,8 +169,9 @@ function FormattingBar({ editor, typo, onTypoChange, bgColor }) {
       className="sticky z-10 flex items-center gap-1 px-4 py-2 flex-wrap"
       style={{ top: 57, background: bgColor, borderBottom: "1px solid rgba(255,255,255,0.06)" }}
     >
-      <FontSelect value={typo.font} onChange={(v) => onTypoChange({ ...typo, font: v })} />
-      <FontSizeSelect value={typo.size} onChange={(v) => onTypoChange({ ...typo, size: v })} />
+      {/* Pass editor so selects can refocus after change */}
+      <FontSelect value={typo.font} onChange={(v) => onTypoChange({ ...typo, font: v })} editor={editor} />
+      <FontSizeSelect value={typo.size} onChange={(v) => onTypoChange({ ...typo, size: v })} editor={editor} />
       <ToolDivider />
       <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive("bold")} title="Bold"><Bold size={13} /></ToolBtn>
       <ToolBtn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive("italic")} title="Italic"><Italic size={13} /></ToolBtn>
@@ -183,7 +196,11 @@ function FormattingBar({ editor, typo, onTypoChange, bgColor }) {
         {THEMES.map((t) => (
           <button
             key={t.label}
-            onMouseDown={(e) => { e.preventDefault(); onTypoChange({ ...typo, theme: t }); }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onTypoChange({ ...typo, theme: t });
+            }}
             title={t.label}
             className="rounded-md transition-all"
             style={{
@@ -202,13 +219,16 @@ function FormattingBar({ editor, typo, onTypoChange, bgColor }) {
 
 function ConfirmModal({ message, onConfirm, onCancel }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
-      onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+      onClick={(e) => e.stopPropagation()}
+    >
       <div className="rounded-2xl border border-white/10 p-6 w-80" style={{ background: "#111" }}>
         <p className="font-mono text-sm text-white/70 mb-6">{message}</p>
         <div className="flex justify-end gap-3">
           <button onClick={onCancel} className="px-4 py-2 rounded-lg border border-white/10 text-white/40 font-mono text-xs tracking-widest hover:text-white/60 transition-colors cursor-pointer">CANCEL</button>
-          <button onClick={onConfirm} className="px-4 py-2 rounded-lg font-mono text-xs tracking-widest" style={{ background: "#ef4444", color: "white", cursor: "pointer" }}>DELETE</button>
+          <button onClick={onConfirm} className="px-4 py-2 rounded-lg font-mono text-xs tracking-widest cursor-pointer" style={{ background: "#ef4444", color: "white" }}>DELETE</button>
         </div>
       </div>
     </div>
@@ -222,13 +242,14 @@ function JournalEditor({ journal, onClose }) {
   const [title, setTitle] = useState(journal?.title || "");
   const [saveStatus, setSaveStatus] = useState("idle");
   const [typo, setTypo] = useState(DEFAULT_TYPO);
+  const [, forceUpdate] = useState(0);
 
-  // ── ALL refs declared here, BEFORE useEditor ──────────────────────────────
-  const journalIdRef      = useRef(journal?.id || null);
-  const autosaveTimerRef  = useRef(null);
-  const savedTimerRef     = useRef(null);
-  const editorReadyRef    = useRef(false); // true once editor has fully mounted
-  const titleMountedRef   = useRef(false); // true after first title render
+  // ── ALL refs declared BEFORE useEditor ───────────────────────────────────
+  const journalIdRef     = useRef(journal?.id || null);
+  const autosaveTimerRef = useRef(null);
+  const savedTimerRef    = useRef(null);
+  const editorReadyRef   = useRef(false);
+  const titleMountedRef  = useRef(false);
 
   // ── Editor ────────────────────────────────────────────────────────────────
   const editor = useEditor({
@@ -247,18 +268,19 @@ function JournalEditor({ journal, onClose }) {
       attributes: { class: "chalk-editor focus:outline-none" },
     },
     onCreate: () => {
-      // Mark editor as ready AFTER initial content hydration
-      // Use a small timeout so any initial onUpdate fires first
       setTimeout(() => { editorReadyRef.current = true; }, 50);
     },
     onUpdate: () => {
-      // Ignore updates until editor is fully ready
       if (!editorReadyRef.current) return;
+      forceUpdate(n => n + 1);
       scheduleAutosave();
     },
+    onSelectionUpdate: () => {
+    forceUpdate(n => n + 1);
+     },
   });
 
-  // ── Autosave helpers ──────────────────────────────────────────────────────
+  // ── Autosave ──────────────────────────────────────────────────────────────
 
   function scheduleAutosave() {
     setSaveStatus("unsaved");
@@ -293,17 +315,14 @@ function JournalEditor({ journal, onClose }) {
     }
   }
 
-  // ── Title change → autosave (skip initial mount) ──────────────────────────
+  // Title change autosave — skip mount
   useEffect(() => {
-    if (!titleMountedRef.current) {
-      titleMountedRef.current = true;
-      return;
-    }
+    if (!titleMountedRef.current) { titleMountedRef.current = true; return; }
     if (!title && !journalIdRef.current) return;
     scheduleAutosave();
   }, [title]);
 
-  // ── Cleanup ───────────────────────────────────────────────────────────────
+  // Cleanup
   useEffect(() => {
     return () => {
       if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
@@ -358,7 +377,6 @@ function JournalEditor({ journal, onClose }) {
         className="flex items-center px-6 py-4 border-b sticky top-0 z-20 transition-colors duration-300"
         style={{ background: typo.theme.bg, borderColor: "rgba(255,255,255,0.06)", height: 57, gap: 16 }}
       >
-        {/* Back */}
         <button
           onClick={handleBack}
           className="flex items-center gap-2 font-mono text-xs tracking-widest transition-colors shrink-0"
@@ -368,15 +386,11 @@ function JournalEditor({ journal, onClose }) {
         >
           <ArrowLeft size={14} /> JOURNALS
         </button>
-
-        {/* Push indicator to right */}
         <div style={{ flex: 1 }} />
-
-        {/* Save indicator */}
         <SaveIndicator status={saveStatus} />
       </div>
 
-      {/* ── Sticky formatting bar ── */}
+      {/* ── Formatting bar ── */}
       <FormattingBar editor={editor} typo={typo} onTypoChange={setTypo} bgColor={typo.theme.bg} />
 
       {/* ── Editor body ── */}
@@ -414,7 +428,7 @@ function JournalCard({ journal, onEdit, onDelete }) {
 
   return (
     <div
-      className="group relative rounded-2xl border border-white/8 hover:border-white/20 transition-all duration-200 overflow-hidden"
+      className="group relative rounded-2xl border border-white/8 hover:border-white/20 transition-all duration-200 overflow-hidden cursor-pointer"
       style={{ background: "#111" }}
       onClick={() => onEdit(journal)}
     >
@@ -424,33 +438,37 @@ function JournalCard({ journal, onEdit, onDelete }) {
           <h3 className="font-mono text-sm text-white leading-snug flex-1 min-w-0 truncate">
             {hasTitle ? journal.title : <span className="text-white/30 italic">Untitled</span>}
           </h3>
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button onClick={() => onEdit(journal)} className="p-1.5 rounded-lg hover:bg-white/8 text-white/30 hover:text-white/70 transition-all cursor-pointer"><Pencil size={12} /></button>
             <button onClick={() => setShowConfirm(true)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/30 hover:text-red-400 transition-all cursor-pointer"><Trash2 size={12} /></button>
           </div>
         </div>
+
         {journal.content && (
           <p className="font-mono text-xs text-white/35 leading-relaxed mb-3 line-clamp-2">{excerpt(journal.content)}</p>
         )}
-        <div className="flex items-center gap-2 flex-wrap">
+
+        <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-1.5 text-white/20">
-            <Clock size={10}/>
+            <Clock size={10} />
             <span className="font-mono text-[10px]">{formatDate(journal.created_at)}</span>
             <span className="font-mono text-[10px]">·</span>
             <span className="font-mono text-[10px]">{formatTime(journal.created_at)}</span>
           </div>
           {edited && (
-            <>
-              <div className="flex items-center gap-1.5 text-white/20 ml-10">
+            <div className="flex items-center gap-1.5 text-white/20">
               <Pencil size={10} />
               <span className="font-mono text-[10px]">{formatDate(journal.updated_at)}</span>
               <span className="font-mono text-[10px]">·</span>
               <span className="font-mono text-[10px]">{formatTime(journal.updated_at)}</span>
             </div>
-            </>
           )}
         </div>
       </div>
+
       {showConfirm && (
         <ConfirmModal
           message={`Delete "${hasTitle ? journal.title : "this entry"}"?`}
