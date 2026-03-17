@@ -350,21 +350,16 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
 
           {/* Actions */}
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
-            <button
-              onClick={handleExpand}
-              className="p-1.5 rounded-lg hover:bg-white/8 text-white/30 hover:text-white/70 transition-all"
-            >
-              {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-            </button>
+            
             <button
               onClick={(e) => { e.stopPropagation(); onEdit(streak); }}
-              className="p-1.5 rounded-lg hover:bg-white/8 text-white/30 hover:text-white/70 transition-all"
+              className="p-1.5 rounded-lg hover:bg-white/8 text-white/30 hover:text-white/70 transition-all cursor-pointer"
             >
               <Pencil size={12} />
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); setShowConfirm(true); }}
-              className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/30 hover:text-red-400 transition-all"
+              className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/30 hover:text-red-400 transition-all cursor-pointer"
             >
               <Trash2 size={12} />
             </button>
@@ -390,7 +385,7 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
           {/* Expand toggle (always visible) */}
           <button
             onClick={handleExpand}
-            className="flex items-center gap-1 font-mono text-[10px] tracking-widest text-white/35 hover:text-[#c8f04c] transition-colors"
+            className="flex items-center gap-1 font-mono text-[10px] tracking-widest text-white/35 hover:text-[#c8f04c] transition-colors cursor-pointer"
           >
             {expanded ? "HIDE" : "HISTORY"} {expanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
           </button>

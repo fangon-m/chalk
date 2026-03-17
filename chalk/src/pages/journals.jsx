@@ -202,12 +202,13 @@ function FormattingBar({ editor, typo, onTypoChange, bgColor }) {
 
 function ConfirmModal({ message, onConfirm, onCancel }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+      onClick={(e) => e.stopPropagation()}>
       <div className="rounded-2xl border border-white/10 p-6 w-80" style={{ background: "#111" }}>
         <p className="font-mono text-sm text-white/70 mb-6">{message}</p>
         <div className="flex justify-end gap-3">
-          <button onClick={onCancel} className="px-4 py-2 rounded-lg border border-white/10 text-white/40 font-mono text-xs tracking-widest hover:text-white/60 transition-colors">CANCEL</button>
-          <button onClick={onConfirm} className="px-4 py-2 rounded-lg font-mono text-xs tracking-widest" style={{ background: "#ef4444", color: "white" }}>DELETE</button>
+          <button onClick={onCancel} className="px-4 py-2 rounded-lg border border-white/10 text-white/40 font-mono text-xs tracking-widest hover:text-white/60 transition-colors cursor-pointer">CANCEL</button>
+          <button onClick={onConfirm} className="px-4 py-2 rounded-lg font-mono text-xs tracking-widest" style={{ background: "#ef4444", color: "white", cursor: "pointer" }}>DELETE</button>
         </div>
       </div>
     </div>
@@ -413,7 +414,7 @@ function JournalCard({ journal, onEdit, onDelete }) {
 
   return (
     <div
-      className="group relative rounded-2xl border border-white/8 hover:border-white/20 transition-all duration-200 cursor-pointer overflow-hidden"
+      className="group relative rounded-2xl border border-white/8 hover:border-white/20 transition-all duration-200 overflow-hidden"
       style={{ background: "#111" }}
       onClick={() => onEdit(journal)}
     >
@@ -424,8 +425,8 @@ function JournalCard({ journal, onEdit, onDelete }) {
             {hasTitle ? journal.title : <span className="text-white/30 italic">Untitled</span>}
           </h3>
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => onEdit(journal)} className="p-1.5 rounded-lg hover:bg-white/8 text-white/30 hover:text-white/70 transition-all"><Pencil size={12} /></button>
-            <button onClick={() => setShowConfirm(true)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/30 hover:text-red-400 transition-all"><Trash2 size={12} /></button>
+            <button onClick={() => onEdit(journal)} className="p-1.5 rounded-lg hover:bg-white/8 text-white/30 hover:text-white/70 transition-all cursor-pointer"><Pencil size={12} /></button>
+            <button onClick={() => setShowConfirm(true)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/30 hover:text-red-400 transition-all cursor-pointer"><Trash2 size={12} /></button>
           </div>
         </div>
         {journal.content && (
