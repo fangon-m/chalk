@@ -6,13 +6,69 @@ import {
   List, ListOrdered, Quote, Minus, Code, Heading1, Heading2,
   Cloud, CloudOff, CloudUpload,
 } from "lucide-react";
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, Mark, mergeAttributes } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Typography from "@tiptap/extension-typography";
 import TextAlign from "@tiptap/extension-text-align";
 import Underline from "@tiptap/extension-underline";
 import { getJournals, createJournal, updateJournal, deleteJournal } from "../lib/journals";
+
+// ── Custom marks ──────────────────────────────────────────────────────────────
+// FontFamilyMark and FontSizeMark wrap ONLY the selected text in a <span style="...">.
+// They do NOT affect the editor's base font — that's controlled by .chalk-editor CSS.
+
+const FontFamilyMark = Mark.create({
+  name: "fontFamily",
+  addAttributes() {
+    return {
+      fontFamily: {
+        default: null,
+        parseHTML: (el) => el.style.fontFamily || null,
+        renderHTML: (attrs) => attrs.fontFamily ? { style: `font-family: ${attrs.fontFamily}` } : {},
+      },
+    };
+  },
+  parseHTML() {
+    return [{ tag: "span", getAttrs: (el) => el.style.fontFamily ? { fontFamily: el.style.fontFamily } : false }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["span", mergeAttributes(HTMLAttributes), 0];
+  },
+  addCommands() {
+    return {
+      setFontFamily: (fontFamily) => ({ commands }) => commands.setMark(this.name, { fontFamily }),
+      unsetFontFamily: () => ({ commands }) => commands.unsetMark(this.name),
+    };
+  },
+});
+
+const FontSizeMark = Mark.create({
+  name: "fontSize",
+  // Allow FontSizeMark to coexist with FontFamilyMark on the same span
+  inclusive: true,
+  addAttributes() {
+    return {
+      fontSize: {
+        default: null,
+        parseHTML: (el) => el.style.fontSize || null,
+        renderHTML: (attrs) => attrs.fontSize ? { style: `font-size: ${attrs.fontSize}` } : {},
+      },
+    };
+  },
+  parseHTML() {
+    return [{ tag: "span", getAttrs: (el) => el.style.fontSize ? { fontSize: el.style.fontSize } : false }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["span", mergeAttributes(HTMLAttributes), 0];
+  },
+  addCommands() {
+    return {
+      setFontSize: (fontSize) => ({ commands }) => commands.setMark(this.name, { fontSize }),
+      unsetFontSize: () => ({ commands }) => commands.unsetMark(this.name),
+    };
+  },
+});
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -43,6 +99,7 @@ const THEMES = [
   { label: "Slate", bg: "#0f1419" },
 ];
 
+// DEFAULT_TYPO only controls the editor body — title is always DM Mono
 const DEFAULT_TYPO = { font: "'DM Mono', monospace", size: "15px", theme: THEMES[0] };
 const AUTOSAVE_DELAY = 2000;
 
@@ -60,36 +117,14 @@ function excerpt(content, len = 120) {
 
 function SaveIndicator({ status }) {
   const configs = {
-    idle: {
-      icon: <Cloud size={14} />,
-      label: "All changes saved",
-      color: "rgba(255,255,255,0.15)",
-    },
-    unsaved: {
-      icon: <CloudUpload size={14} />,
-      label: "Unsaved changes",
-      color: "rgba(255,255,255,0.35)",
-    },
-    saving: {
-      icon: <Loader2 size={14} className="animate-spin" />,
-      label: "Saving…",
-      color: "rgba(255,255,255,0.3)",
-    },
-    saved: {
-      icon: <Cloud size={14} />,
-      label: "Saved",
-      color: "rgba(200,240,76,0.7)",
-    },
-    error: {
-      icon: <CloudOff size={14} />,
-      label: "Save failed",
-      color: "#ef4444",
-    },
+    idle:    { icon: <Cloud size={14} />,                            label: "All changes saved", color: "rgba(255,255,255,0.15)" },
+    unsaved: { icon: <CloudUpload size={14} />,                      label: "Unsaved changes",   color: "rgba(255,255,255,0.35)" },
+    saving:  { icon: <Loader2 size={14} className="animate-spin" />, label: "Saving…",           color: "rgba(255,255,255,0.3)"  },
+    saved:   { icon: <Cloud size={14} />,                            label: "Saved",             color: "rgba(200,240,76,0.7)"   },
+    error:   { icon: <CloudOff size={14} />,                         label: "Save failed",       color: "#ef4444"                },
   };
-
   const cfg = configs[status];
   if (!cfg) return null;
-
   return (
     <div className="flex items-center gap-1.5 transition-all duration-300" style={{ color: cfg.color }}>
       {cfg.icon}
@@ -100,15 +135,10 @@ function SaveIndicator({ status }) {
 
 // ── Toolbar helpers ───────────────────────────────────────────────────────────
 
-// onMouseDown + preventDefault keeps editor focus/selection intact
 function ToolBtn({ onClick, active, title, children }) {
   return (
     <button
-      onMouseDown={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onClick();
-      }}
+      onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); }}
       title={title}
       className="flex items-center justify-center rounded-md transition-all"
       style={{
@@ -127,35 +157,42 @@ function ToolDivider() {
   return <div style={{ width: 1, height: 18, background: "rgba(255,255,255,0.08)", margin: "0 2px", flexShrink: 0 }} />;
 }
 
-// Refocus editor after select change so selection is retained
-function FontSizeSelect({ value, onChange, editor }) {
+// FontSelect — applies font-family ONLY to highlighted text via mark command
+function FontSelect({ typoFont, onTypoChange, editor }) {
   return (
     <select
-      value={value}
+      value={typoFont}
+      onMouseDown={(e) => e.stopPropagation()}
       onChange={(e) => {
-        onChange(e.target.value);
-        setTimeout(() => editor?.commands.focus(), 0);
-      }}
-      className="font-mono text-[11px] rounded-md px-1 focus:outline-none cursor-pointer"
-      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)", height: 28 }}
-    >
-      {FONT_SIZES.map((s) => <option key={s} value={s} style={{ background: "#111" }}>{s}</option>)}
-    </select>
-  );
-}
-
-function FontSelect({ value, onChange, editor }) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => {
-        onChange(e.target.value);
-        setTimeout(() => editor?.commands.focus(), 0);
+        const v = e.target.value;
+        onTypoChange(v);                               // update base CSS for new unformatted text
+        editor?.chain().focus().setFontFamily(v).run(); // apply mark to current selection only
       }}
       className="font-mono text-[11px] rounded-md px-1 focus:outline-none cursor-pointer"
       style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)", height: 28, maxWidth: 80 }}
     >
       {FONTS.map((f) => <option key={f.value} value={f.value} style={{ background: "#111" }}>{f.label}</option>)}
+    </select>
+  );
+}
+
+// FontSizeSelect — applies font-size ONLY to highlighted text via mark command
+// Does NOT update typo.size so the editor base size never changes
+function FontSizeSelect({ typoSize, editor }) {
+  return (
+    <select
+      value={typoSize}
+      onMouseDown={(e) => e.stopPropagation()}
+      onChange={(e) => {
+        const v = e.target.value;
+        // Only apply to selection — do NOT call onTypoChange for size
+        // so the base editor font-size stays unchanged
+        editor?.chain().focus().setFontSize(v).run();
+      }}
+      className="font-mono text-[11px] rounded-md px-1 focus:outline-none cursor-pointer"
+      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)", height: 28 }}
+    >
+      {FONT_SIZES.map((s) => <option key={s} value={s} style={{ background: "#111" }}>{s}</option>)}
     </select>
   );
 }
@@ -169,38 +206,33 @@ function FormattingBar({ editor, typo, onTypoChange, bgColor }) {
       className="sticky z-10 flex items-center gap-1 px-4 py-2 flex-wrap"
       style={{ top: 57, background: bgColor, borderBottom: "1px solid rgba(255,255,255,0.06)" }}
     >
-      {/* Pass editor so selects can refocus after change */}
-      <FontSelect value={typo.font} onChange={(v) => onTypoChange({ ...typo, font: v })} editor={editor} />
-      <FontSizeSelect value={typo.size} onChange={(v) => onTypoChange({ ...typo, size: v })} editor={editor} />
+      <FontSelect typoFont={typo.font} onTypoChange={(v) => onTypoChange({ ...typo, font: v })} editor={editor} />
+      <FontSizeSelect typoSize={typo.size} editor={editor} />
       <ToolDivider />
-      <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive("bold")} title="Bold"><Bold size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive("italic")} title="Italic"><Italic size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive("underline")} title="Underline"><UnderlineIcon size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive("code")} title="Code"><Code size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()}                            active={editor.isActive("bold")}                   title="Bold"><Bold size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleItalic().run()}                          active={editor.isActive("italic")}                 title="Italic"><Italic size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleUnderline().run()}                       active={editor.isActive("underline")}              title="Underline"><UnderlineIcon size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleCode().run()}                            active={editor.isActive("code")}                   title="Code"><Code size={13} /></ToolBtn>
       <ToolDivider />
-      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive("heading", { level: 1 })} title="Heading 1"><Heading1 size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive("heading", { level: 2 })} title="Heading 2"><Heading2 size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}             active={editor.isActive("heading", { level: 1 })} title="Heading 1"><Heading1 size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}             active={editor.isActive("heading", { level: 2 })} title="Heading 2"><Heading2 size={13} /></ToolBtn>
       <ToolDivider />
-      <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive("bulletList")} title="Bullet list"><List size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive("orderedList")} title="Numbered list"><ListOrdered size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive("blockquote")} title="Blockquote"><Quote size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()}                      active={editor.isActive("bulletList")}             title="Bullet list"><List size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()}                     active={editor.isActive("orderedList")}            title="Numbered list"><ListOrdered size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleBlockquote().run()}                      active={editor.isActive("blockquote")}             title="Blockquote"><Quote size={13} /></ToolBtn>
       <ToolDivider />
-      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("left").run()} active={editor.isActive({ textAlign: "left" })} title="Left"><AlignLeft size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("center").run()} active={editor.isActive({ textAlign: "center" })} title="Center"><AlignCenter size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("right").run()} active={editor.isActive({ textAlign: "right" })} title="Right"><AlignRight size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("justify").run()} active={editor.isActive({ textAlign: "justify" })} title="Justify"><AlignJustify size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("left").run()}                    active={editor.isActive({ textAlign: "left" })}    title="Left"><AlignLeft size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("center").run()}                  active={editor.isActive({ textAlign: "center" })}  title="Center"><AlignCenter size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("right").run()}                   active={editor.isActive({ textAlign: "right" })}   title="Right"><AlignRight size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("justify").run()}                 active={editor.isActive({ textAlign: "justify" })} title="Justify"><AlignJustify size={13} /></ToolBtn>
       <ToolDivider />
-      <ToolBtn onClick={() => editor.chain().focus().setHorizontalRule().run()} active={false} title="Divider"><Minus size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().setHorizontalRule().run()}                     active={false}                                     title="Divider"><Minus size={13} /></ToolBtn>
       <ToolDivider />
       <div className="flex items-center gap-1 ml-1">
         {THEMES.map((t) => (
           <button
             key={t.label}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onTypoChange({ ...typo, theme: t });
-            }}
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onTypoChange({ ...typo, theme: t }); }}
             title={t.label}
             className="rounded-md transition-all"
             style={{
@@ -244,19 +276,19 @@ function JournalEditor({ journal, onClose }) {
   const [typo, setTypo] = useState(DEFAULT_TYPO);
   const [, forceUpdate] = useState(0);
 
-  // ── ALL refs declared BEFORE useEditor ───────────────────────────────────
   const journalIdRef     = useRef(journal?.id || null);
   const autosaveTimerRef = useRef(null);
   const savedTimerRef    = useRef(null);
   const editorReadyRef   = useRef(false);
   const titleMountedRef  = useRef(false);
 
-  // ── Editor ────────────────────────────────────────────────────────────────
   const editor = useEditor({
     extensions: [
       StarterKit,
       Underline,
       Typography,
+      FontFamilyMark,
+      FontSizeMark,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       Placeholder.configure({
         placeholder: ({ node }) =>
@@ -276,11 +308,9 @@ function JournalEditor({ journal, onClose }) {
       scheduleAutosave();
     },
     onSelectionUpdate: () => {
-    forceUpdate(n => n + 1);
-     },
+      forceUpdate(n => n + 1);
+    },
   });
-
-  // ── Autosave ──────────────────────────────────────────────────────────────
 
   function scheduleAutosave() {
     setSaveStatus("unsaved");
@@ -292,19 +322,12 @@ function JournalEditor({ journal, onClose }) {
     const content = editor?.getHTML() || "";
     const isEmpty = !content || content === "<p></p>";
     if (isEmpty && !title.trim()) return;
-
     setSaveStatus("saving");
     try {
       if (journalIdRef.current) {
-        await updateJournal(journalIdRef.current, {
-          title: title.trim(),
-          content: isEmpty ? "" : content,
-        });
+        await updateJournal(journalIdRef.current, { title: title.trim(), content: isEmpty ? "" : content });
       } else {
-        const created = await createJournal({
-          title: title.trim(),
-          content: isEmpty ? "" : content,
-        });
+        const created = await createJournal({ title: title.trim(), content: isEmpty ? "" : content });
         journalIdRef.current = created.id;
       }
       setSaveStatus("saved");
@@ -315,14 +338,12 @@ function JournalEditor({ journal, onClose }) {
     }
   }
 
-  // Title change autosave — skip mount
   useEffect(() => {
     if (!titleMountedRef.current) { titleMountedRef.current = true; return; }
     if (!title && !journalIdRef.current) return;
     scheduleAutosave();
   }, [title]);
 
-  // Cleanup
   useEffect(() => {
     return () => {
       if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
@@ -343,6 +364,14 @@ function JournalEditor({ journal, onClose }) {
     <div className="flex flex-col transition-colors duration-300" style={{ background: typo.theme.bg, minHeight: "100vh" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap');
+
+        /* Title input — always DM Mono, never affected by typo state */
+        .chalk-title {
+          font-family: 'DM Mono', monospace !important;
+          font-size: 1.5rem !important;
+        }
+
+        /* Editor body — base font controlled by typo state */
         .chalk-editor {
           font-family: ${typo.font};
           font-size: ${typo.size};
@@ -367,12 +396,18 @@ function JournalEditor({ journal, onClose }) {
         .chalk-editor strong { color: rgba(255,255,255,0.95); font-weight: 600; }
         .chalk-editor em { font-style: italic; }
         .chalk-editor u { text-decoration: underline; text-underline-offset: 3px; }
+
+        /* Inline marks — must use !important so they override the base editor CSS */
+        .chalk-editor span[style*="font-family"] { font-family: inherit; }
+        .chalk-editor span[style*="font-size"] { font-size: inherit; }
+        .chalk-editor span[style] { font-family: unset; font-size: unset; }
+
         .chalk-editor .is-editor-empty:first-child::before,
         .chalk-editor .is-empty::before { content: attr(data-placeholder); color: rgba(255,255,255,0.15); pointer-events: none; float: left; height: 0; }
         .chalk-editor ::selection { background: rgba(200,240,76,0.2); }
       `}</style>
 
-      {/* ── Top bar ── */}
+      {/* Top bar */}
       <div
         className="flex items-center px-6 py-4 border-b sticky top-0 z-20 transition-colors duration-300"
         style={{ background: typo.theme.bg, borderColor: "rgba(255,255,255,0.06)", height: 57, gap: 16 }}
@@ -390,17 +425,18 @@ function JournalEditor({ journal, onClose }) {
         <SaveIndicator status={saveStatus} />
       </div>
 
-      {/* ── Formatting bar ── */}
+      {/* Formatting bar */}
       <FormattingBar editor={editor} typo={typo} onTypoChange={setTypo} bgColor={typo.theme.bg} />
 
-      {/* ── Editor body ── */}
+      {/* Editor body */}
       <div className="max-w-2xl mx-auto w-full px-6 py-10">
+        {/* Title — hardcoded to DM Mono via chalk-title class, never changes */}
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Entry title (optional)"
-          className="w-full bg-transparent text-2xl focus:outline-none mb-6 border-none"
-          style={{ fontFamily: typo.font, color: "rgba(255,255,255,0.9)", caretColor: "#c8f04c" }}
+          className="chalk-title w-full bg-transparent focus:outline-none mb-6 border-none"
+          style={{ color: "rgba(255,255,255,0.9)", caretColor: "#c8f04c" }}
         />
 
         <div className="flex items-center gap-3 mb-8">
@@ -438,19 +474,14 @@ function JournalCard({ journal, onEdit, onDelete }) {
           <h3 className="font-mono text-sm text-white leading-snug flex-1 min-w-0 truncate">
             {hasTitle ? journal.title : <span className="text-white/30 italic">Untitled</span>}
           </h3>
-          <div
-            className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={(e) => e.stopPropagation()}>
             <button onClick={() => onEdit(journal)} className="p-1.5 rounded-lg hover:bg-white/8 text-white/30 hover:text-white/70 transition-all cursor-pointer"><Pencil size={12} /></button>
             <button onClick={() => setShowConfirm(true)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/30 hover:text-red-400 transition-all cursor-pointer"><Trash2 size={12} /></button>
           </div>
         </div>
-
         {journal.content && (
           <p className="font-mono text-xs text-white/35 leading-relaxed mb-3 line-clamp-2">{excerpt(journal.content)}</p>
         )}
-
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-1.5 text-white/20">
             <Clock size={10} />
@@ -468,7 +499,6 @@ function JournalCard({ journal, onEdit, onDelete }) {
           )}
         </div>
       </div>
-
       {showConfirm && (
         <ConfirmModal
           message={`Delete "${hasTitle ? journal.title : "this entry"}"?`}
