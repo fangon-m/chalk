@@ -4,7 +4,7 @@ import {
   ArrowLeft, Clock, Bold, Italic, Underline as UnderlineIcon,
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
   List, ListOrdered, Quote, Minus, Code, Heading1, Heading2,
-  Cloud, CloudOff, CloudUpload,
+  Cloud, CloudOff, CloudUpload, Undo, Redo,
 } from "lucide-react";
 import { useEditor, EditorContent, Mark, mergeAttributes } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -93,10 +93,14 @@ const FONTS = [
 const FONT_SIZES = ["12px", "14px", "16px", "18px", "22px", "28px"];
 
 const THEMES = [
-  { label: "Dark",  bg: "#0d0d0d" },
-  { label: "Dim",   bg: "#181818" },
-  { label: "Sepia", bg: "#181410" },
-  { label: "Slate", bg: "#0f1419" },
+  { label: "Dark",     bg: "#0d0d0d" },
+  { label: "Dim",      bg: "#181818" },
+  { label: "Gray",     bg: "#2a2a2a" },
+  { label: "Charcoal", bg: "#1a1a1a" },
+  { label: "White",    bg: "#f5f5f0" },
+  { label: "Beige",    bg: "#e8dcc8" },
+  { label: "Stone",    bg: "#d9d9d9" },
+  { label: "Ash",      bg: "#e0e0e0" },
 ];
 
 // DEFAULT_TYPO only controls the editor body — title is always DM Mono
@@ -115,12 +119,12 @@ function excerpt(content, len = 120) {
 
 // ── Save Indicator ────────────────────────────────────────────────────────────
 
-function SaveIndicator({ status }) {
+function SaveIndicator({ status, isLightTheme }) {
   const configs = {
-    idle:    { icon: <Cloud size={14} />,                            label: "All changes saved", color: "rgba(255,255,255,0.15)" },
-    unsaved: { icon: <CloudUpload size={14} />,                      label: "Unsaved changes",   color: "rgba(255,255,255,0.35)" },
-    saving:  { icon: <Loader2 size={14} className="animate-spin" />, label: "Saving…",           color: "rgba(255,255,255,0.3)"  },
-    saved:   { icon: <Cloud size={14} />,                            label: "Saved",             color: "rgba(200,240,76,0.7)"   },
+    idle:    { icon: <Cloud size={14} />,                            label: "All changes saved", color: isLightTheme ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.15)" },
+    unsaved: { icon: <CloudUpload size={14} />,                      label: "Unsaved changes",   color: isLightTheme ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.35)" },
+    saving:  { icon: <Loader2 size={14} className="animate-spin" />, label: "Saving…",           color: isLightTheme ? "rgba(0,0,0,0.3)" : "rgba(255,255,255,0.3)"  },
+    saved:   { icon: <Cloud size={14} />,                            label: "Saved",             color: isLightTheme ? "#8b5a3c" : "rgba(200,240,76,0.7)"   },
     error:   { icon: <CloudOff size={14} />,                         label: "Save failed",       color: "#ef4444"                },
   };
   const cfg = configs[status];
@@ -135,7 +139,7 @@ function SaveIndicator({ status }) {
 
 // ── Toolbar helpers ───────────────────────────────────────────────────────────
 
-function ToolBtn({ onClick, active, title, children }) {
+function ToolBtn({ onClick, active, title, children, isLightTheme }) {
   return (
     <button
       onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); }}
@@ -143,9 +147,10 @@ function ToolBtn({ onClick, active, title, children }) {
       className="flex items-center justify-center rounded-md transition-all"
       style={{
         width: 28, height: 28, flexShrink: 0,
-        background: active ? "rgba(200,240,76,0.15)" : "transparent",
-        color: active ? "#c8f04c" : "rgba(255,255,255,0.45)",
-        border: active ? "1px solid rgba(200,240,76,0.25)" : "1px solid transparent",
+        background: active ? isLightTheme ? "rgba(212,165,116,0.15)" : "rgba(200,240,76,0.15)" : "transparent",
+        color: active ? isLightTheme ? "#8b5a3c" : "#c8f04c" : isLightTheme ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.45)",
+        border: active ? isLightTheme ? "1px solid rgba(212,165,116,0.25)" : "1px solid rgba(200,240,76,0.25)" : "1px solid transparent",
+        cursor: "pointer",
       }}
     >
       {children}
@@ -153,12 +158,12 @@ function ToolBtn({ onClick, active, title, children }) {
   );
 }
 
-function ToolDivider() {
-  return <div style={{ width: 1, height: 18, background: "rgba(255,255,255,0.08)", margin: "0 2px", flexShrink: 0 }} />;
+function ToolDivider({ isLightTheme }) {
+  return <div style={{ width: 1, height: 18, background: isLightTheme ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.08)", margin: "0 2px", flexShrink: 0 }} />;
 }
 
 // FontSelect — applies font-family ONLY to highlighted text via mark command
-function FontSelect({ typoFont, onTypoChange, editor }) {
+function FontSelect({ typoFont, onTypoChange, editor, isLightTheme }) {
   return (
     <select
       value={typoFont}
@@ -169,7 +174,7 @@ function FontSelect({ typoFont, onTypoChange, editor }) {
         editor?.chain().focus().setFontFamily(v).run(); // apply mark to current selection only
       }}
       className="font-mono text-[11px] rounded-md px-1 focus:outline-none cursor-pointer"
-      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)", height: 28, maxWidth: 80 }}
+      style={{ background: isLightTheme ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)", border: isLightTheme ? "1px solid rgba(0,0,0,0.1)" : "1px solid rgba(255,255,255,0.1)", color: isLightTheme ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.5)", height: 28, maxWidth: 80 }}
     >
       {FONTS.map((f) => <option key={f.value} value={f.value} style={{ background: "#111" }}>{f.label}</option>)}
     </select>
@@ -178,7 +183,7 @@ function FontSelect({ typoFont, onTypoChange, editor }) {
 
 // FontSizeSelect — applies font-size ONLY to highlighted text via mark command
 // Does NOT update typo.size so the editor base size never changes
-function FontSizeSelect({ typoSize, editor }) {
+function FontSizeSelect({ typoSize, editor, isLightTheme }) {
   return (
     <select
       value={typoSize}
@@ -190,7 +195,7 @@ function FontSizeSelect({ typoSize, editor }) {
         editor?.chain().focus().setFontSize(v).run();
       }}
       className="font-mono text-[11px] rounded-md px-1 focus:outline-none cursor-pointer"
-      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)", height: 28 }}
+      style={{ background: isLightTheme ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)", border: isLightTheme ? "1px solid rgba(0,0,0,0.1)" : "1px solid rgba(255,255,255,0.1)", color: isLightTheme ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.5)", height: 28 }}
     >
       {FONT_SIZES.map((s) => <option key={s} value={s} style={{ background: "#111" }}>{s}</option>)}
     </select>
@@ -199,35 +204,38 @@ function FontSizeSelect({ typoSize, editor }) {
 
 // ── Formatting Bar ────────────────────────────────────────────────────────────
 
-function FormattingBar({ editor, typo, onTypoChange, bgColor }) {
+function FormattingBar({ editor, typo, onTypoChange, bgColor, isLightTheme }) {
   if (!editor) return null;
   return (
     <div
       className="sticky z-10 flex items-center gap-1 px-4 py-2 flex-wrap"
-      style={{ top: 57, background: bgColor, borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+      style={{ top: 57, background: bgColor, borderBottom: isLightTheme ? "1px solid rgba(0,0,0,0.1)" : "1px solid rgba(255,255,255,0.06)" }}
     >
-      <FontSelect typoFont={typo.font} onTypoChange={(v) => onTypoChange({ ...typo, font: v })} editor={editor} />
-      <FontSizeSelect typoSize={typo.size} editor={editor} />
-      <ToolDivider />
-      <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()}                            active={editor.isActive("bold")}                   title="Bold"><Bold size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleItalic().run()}                          active={editor.isActive("italic")}                 title="Italic"><Italic size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleUnderline().run()}                       active={editor.isActive("underline")}              title="Underline"><UnderlineIcon size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleCode().run()}                            active={editor.isActive("code")}                   title="Code"><Code size={13} /></ToolBtn>
-      <ToolDivider />
-      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}             active={editor.isActive("heading", { level: 1 })} title="Heading 1"><Heading1 size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}             active={editor.isActive("heading", { level: 2 })} title="Heading 2"><Heading2 size={13} /></ToolBtn>
-      <ToolDivider />
-      <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()}                      active={editor.isActive("bulletList")}             title="Bullet list"><List size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()}                     active={editor.isActive("orderedList")}            title="Numbered list"><ListOrdered size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleBlockquote().run()}                      active={editor.isActive("blockquote")}             title="Blockquote"><Quote size={13} /></ToolBtn>
-      <ToolDivider />
-      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("left").run()}                    active={editor.isActive({ textAlign: "left" })}    title="Left"><AlignLeft size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("center").run()}                  active={editor.isActive({ textAlign: "center" })}  title="Center"><AlignCenter size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("right").run()}                   active={editor.isActive({ textAlign: "right" })}   title="Right"><AlignRight size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("justify").run()}                 active={editor.isActive({ textAlign: "justify" })} title="Justify"><AlignJustify size={13} /></ToolBtn>
-      <ToolDivider />
-      <ToolBtn onClick={() => editor.chain().focus().setHorizontalRule().run()}                     active={false}                                     title="Divider"><Minus size={13} /></ToolBtn>
-      <ToolDivider />
+      <ToolBtn onClick={() => editor.chain().focus().undo().run()}                            active={false}                                     title="Undo" isLightTheme={isLightTheme}><Undo size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().redo().run()}                            active={false}                                     title="Redo" isLightTheme={isLightTheme}><Redo size={13} /></ToolBtn>
+      <ToolDivider isLightTheme={isLightTheme} />
+      <FontSelect typoFont={typo.font} onTypoChange={(v) => onTypoChange({ ...typo, font: v })} editor={editor} isLightTheme={isLightTheme} />
+      <FontSizeSelect typoSize={typo.size} editor={editor} isLightTheme={isLightTheme} />
+      <ToolDivider isLightTheme={isLightTheme} />
+      <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()}                            active={editor.isActive("bold")}                   title="Bold" isLightTheme={isLightTheme}><Bold size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleItalic().run()}                          active={editor.isActive("italic")}                 title="Italic" isLightTheme={isLightTheme}><Italic size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleUnderline().run()}                       active={editor.isActive("underline")}              title="Underline" isLightTheme={isLightTheme}><UnderlineIcon size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleCode().run()}                            active={editor.isActive("code")}                   title="Code" isLightTheme={isLightTheme}><Code size={13} /></ToolBtn>
+      <ToolDivider isLightTheme={isLightTheme} />
+      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}             active={editor.isActive("heading", { level: 1 })} title="Heading 1" isLightTheme={isLightTheme}><Heading1 size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}             active={editor.isActive("heading", { level: 2 })} title="Heading 2" isLightTheme={isLightTheme}><Heading2 size={13} /></ToolBtn>
+      <ToolDivider isLightTheme={isLightTheme} />
+      <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()}                      active={editor.isActive("bulletList")}             title="Bullet list" isLightTheme={isLightTheme}><List size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()}                     active={editor.isActive("orderedList")}            title="Numbered list" isLightTheme={isLightTheme}><ListOrdered size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleBlockquote().run()}                      active={editor.isActive("blockquote")}             title="Blockquote" isLightTheme={isLightTheme}><Quote size={13} /></ToolBtn>
+      <ToolDivider isLightTheme={isLightTheme} />
+      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("left").run()}                    active={editor.isActive({ textAlign: "left" })}    title="Left" isLightTheme={isLightTheme}><AlignLeft size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("center").run()}                  active={editor.isActive({ textAlign: "center" })}  title="Center" isLightTheme={isLightTheme}><AlignCenter size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("right").run()}                   active={editor.isActive({ textAlign: "right" })}   title="Right" isLightTheme={isLightTheme}><AlignRight size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("justify").run()}                 active={editor.isActive({ textAlign: "justify" })} title="Justify" isLightTheme={isLightTheme}><AlignJustify size={13} /></ToolBtn>
+      <ToolDivider isLightTheme={isLightTheme} />
+      <ToolBtn onClick={() => editor.chain().focus().setHorizontalRule().run()}                     active={false}                                     title="Divider" isLightTheme={isLightTheme}><Minus size={13} /></ToolBtn>
+      <ToolDivider isLightTheme={isLightTheme} />
       <div className="flex items-center gap-1 ml-1">
         {THEMES.map((t) => (
           <button
@@ -238,7 +246,7 @@ function FormattingBar({ editor, typo, onTypoChange, bgColor }) {
             style={{
               width: 18, height: 18,
               background: t.bg,
-              border: typo.theme.label === t.label ? "1.5px solid #c8f04c" : "1.5px solid rgba(255,255,255,0.15)",
+              border: typo.theme.label === t.label ? isLightTheme ? "1.5px solid #8b5a3c" : "1.5px solid #c8f04c" : isLightTheme ? "1.5px solid rgba(0,0,0,0.25)" : "1.5px solid rgba(255,255,255,0.15)",
             }}
           />
         ))}
@@ -360,6 +368,16 @@ function JournalEditor({ journal, onClose }) {
     }
   }
 
+  const isLightTheme = typo.theme.label === "White" || typo.theme.label === "Beige" || typo.theme.label === "Stone" || typo.theme.label === "Ash";
+  const textColor = isLightTheme ? "#2a2a2a" : "rgba(255,255,255,0.78)";
+  const headingColor = isLightTheme ? "#1a1a1a" : "rgba(255,255,255,0.95)";
+  const placeholderColor = isLightTheme ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.15)";
+  const caretColor = isLightTheme ? "#d4a574" : "#c8f04c";
+  const codeBackground = isLightTheme ? "rgba(212,165,116,0.1)" : "rgba(200,240,76,0.08)";
+  const codeColor = isLightTheme ? "#8b5a3c" : "#c8f04c";
+  const blockquoteColor = isLightTheme ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.4)";
+  const blockquoteBorder = isLightTheme ? "rgba(212,165,116,0.35)" : "rgba(200,240,76,0.35)";
+
   return (
     <div className="flex flex-col transition-colors duration-300" style={{ background: typo.theme.bg, minHeight: "100vh" }}>
       <style>{`
@@ -369,6 +387,7 @@ function JournalEditor({ journal, onClose }) {
         .chalk-title {
           font-family: 'DM Mono', monospace !important;
           font-size: 1.5rem !important;
+          color: ${isLightTheme ? "#2a2a2a" : "rgba(255,255,255,0.9)"} !important;
         }
 
         /* Editor body — base font controlled by typo state */
@@ -376,24 +395,24 @@ function JournalEditor({ journal, onClose }) {
           font-family: ${typo.font};
           font-size: ${typo.size};
           line-height: 1.75;
-          color: rgba(255,255,255,0.78);
-          caret-color: #c8f04c;
+          color: ${textColor};
+          caret-color: ${caretColor};
           min-height: 60vh;
         }
         .chalk-editor > * + * { margin-top: 0.6em; }
         .chalk-editor p { margin: 0; }
-        .chalk-editor h1 { font-size: 1.8em; font-weight: 500; color: rgba(255,255,255,0.95); line-height: 1.2; }
-        .chalk-editor h2 { font-size: 1.3em; font-weight: 500; color: rgba(255,255,255,0.9); }
-        .chalk-editor h3 { font-size: 1.1em; font-weight: 500; color: rgba(255,255,255,0.85); }
+        .chalk-editor h1 { font-size: 1.8em; font-weight: 500; color: ${headingColor}; line-height: 1.2; }
+        .chalk-editor h2 { font-size: 1.3em; font-weight: 500; color: ${isLightTheme ? "#1a1a1a" : "rgba(255,255,255,0.9)"}; }
+        .chalk-editor h3 { font-size: 1.1em; font-weight: 500; color: ${isLightTheme ? "#1a1a1a" : "rgba(255,255,255,0.85)"}; }
         .chalk-editor ul { padding-left: 1.4em; list-style: disc; }
         .chalk-editor ol { padding-left: 1.4em; list-style: decimal; }
         .chalk-editor li + li { margin-top: 0.2em; }
-        .chalk-editor blockquote { border-left: 2px solid rgba(200,240,76,0.35); padding-left: 1em; color: rgba(255,255,255,0.4); font-style: italic; }
-        .chalk-editor hr { border: none; border-top: 1px solid rgba(255,255,255,0.08); }
-        .chalk-editor pre { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 1em; font-family: 'Courier New', monospace; font-size: 0.85em; }
-        .chalk-editor code { background: rgba(200,240,76,0.08); color: #c8f04c; border-radius: 4px; padding: 0.1em 0.4em; font-family: 'Courier New', monospace; font-size: 0.85em; }
-        .chalk-editor pre code { background: none; color: rgba(255,255,255,0.7); padding: 0; }
-        .chalk-editor strong { color: rgba(255,255,255,0.95); font-weight: 600; }
+        .chalk-editor blockquote { border-left: 2px solid ${blockquoteBorder}; padding-left: 1em; color: ${blockquoteColor}; font-style: italic; }
+        .chalk-editor hr { border: none; border-top: 1px solid ${isLightTheme ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.08)"}; }
+        .chalk-editor pre { background: ${isLightTheme ? "rgba(0,0,0,0.02)" : "rgba(255,255,255,0.04)"}; border: 1px solid ${isLightTheme ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.07)"}; border-radius: 8px; padding: 1em; font-family: 'Courier New', monospace; font-size: 0.85em; }
+        .chalk-editor code { background: ${codeBackground}; color: ${codeColor}; border-radius: 4px; padding: 0.1em 0.4em; font-family: 'Courier New', monospace; font-size: 0.85em; }
+        .chalk-editor pre code { background: none; color: ${isLightTheme ? "#1a1a1a" : "rgba(255,255,255,0.7)"}; padding: 0; }
+        .chalk-editor strong { color: ${isLightTheme ? "#1a1a1a" : "rgba(255,255,255,0.95)"}; font-weight: 600; }
         .chalk-editor em { font-style: italic; }
         .chalk-editor u { text-decoration: underline; text-underline-offset: 3px; }
 
@@ -403,30 +422,30 @@ function JournalEditor({ journal, onClose }) {
         .chalk-editor span[style] { font-family: unset; font-size: unset; }
 
         .chalk-editor .is-editor-empty:first-child::before,
-        .chalk-editor .is-empty::before { content: attr(data-placeholder); color: rgba(255,255,255,0.15); pointer-events: none; float: left; height: 0; }
-        .chalk-editor ::selection { background: rgba(200,240,76,0.2); }
+        .chalk-editor .is-empty::before { content: attr(data-placeholder); color: ${placeholderColor}; pointer-events: none; float: left; height: 0; }
+        .chalk-editor ::selection { background: ${isLightTheme ? "rgba(212,165,116,0.2)" : "rgba(200,240,76,0.2)"}; }
       `}</style>
 
       {/* Top bar */}
       <div
         className="flex items-center px-6 py-4 border-b sticky top-0 z-20 transition-colors duration-300"
-        style={{ background: typo.theme.bg, borderColor: "rgba(255,255,255,0.06)", height: 57, gap: 16 }}
+        style={{ background: typo.theme.bg, borderColor: isLightTheme ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.06)", height: 57, gap: 16 }}
       >
         <button
           onClick={handleBack}
           className="flex items-center gap-2 font-mono text-xs tracking-widest transition-colors shrink-0"
-          style={{ color: "rgba(255,255,255,0.35)" }}
-          onMouseEnter={e => e.currentTarget.style.color = "rgba(255,255,255,0.7)"}
-          onMouseLeave={e => e.currentTarget.style.color = "rgba(255,255,255,0.35)"}
+          style={{ color: isLightTheme ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.35)" }}
+          onMouseEnter={e => e.currentTarget.style.color = isLightTheme ? "rgba(0,0,0,0.7)" : "rgba(255,255,255,0.7)"}
+          onMouseLeave={e => e.currentTarget.style.color = isLightTheme ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.35)"}
         >
           <ArrowLeft size={14} /> JOURNALS
         </button>
         <div style={{ flex: 1 }} />
-        <SaveIndicator status={saveStatus} />
+        <SaveIndicator status={saveStatus} isLightTheme={isLightTheme} />
       </div>
 
       {/* Formatting bar */}
-      <FormattingBar editor={editor} typo={typo} onTypoChange={setTypo} bgColor={typo.theme.bg} />
+      <FormattingBar editor={editor} typo={typo} onTypoChange={setTypo} bgColor={typo.theme.bg} isLightTheme={isLightTheme} />
 
       {/* Editor body */}
       <div className="max-w-2xl mx-auto w-full px-6 py-10">
@@ -436,17 +455,17 @@ function JournalEditor({ journal, onClose }) {
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Entry title (optional)"
           className="chalk-title w-full bg-transparent focus:outline-none mb-6 border-none"
-          style={{ color: "rgba(255,255,255,0.9)", caretColor: "#c8f04c" }}
+          style={{ color: isLightTheme ? "#2a2a2a" : "rgba(255,255,255,0.9)", caretColor: caretColor }}
         />
 
         <div className="flex items-center gap-3 mb-8">
-          <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
-          <span className="font-mono text-[10px] text-white/20 tracking-widest uppercase">
+          <div className="flex-1 h-px" style={{ background: isLightTheme ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.06)" }} />
+          <span className="font-mono text-[10px] tracking-widest uppercase" style={{ color: isLightTheme ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.2)" }}>
             {isEdit
               ? `Last edited ${formatDate(journal.updated_at)} · ${formatTime(journal.updated_at)}`
               : formatDate(new Date().toISOString())}
           </span>
-          <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
+          <div className="flex-1 h-px" style={{ background: isLightTheme ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.06)" }} />
         </div>
 
         <EditorContent editor={editor} />
