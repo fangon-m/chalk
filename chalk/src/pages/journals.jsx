@@ -15,8 +15,6 @@ import Underline from "@tiptap/extension-underline";
 import { getJournals, createJournal, updateJournal, deleteJournal } from "../lib/journals";
 
 // ── Custom marks ──────────────────────────────────────────────────────────────
-// FontFamilyMark and FontSizeMark wrap ONLY the selected text in a <span style="...">.
-// They do NOT affect the editor's base font — that's controlled by .chalk-editor CSS.
 
 const FontFamilyMark = Mark.create({
   name: "fontFamily",
@@ -45,7 +43,6 @@ const FontFamilyMark = Mark.create({
 
 const FontSizeMark = Mark.create({
   name: "fontSize",
-  // Allow FontSizeMark to coexist with FontFamilyMark on the same span
   inclusive: true,
   addAttributes() {
     return {
@@ -103,8 +100,9 @@ const THEMES = [
   { label: "Ash",      bg: "#e0e0e0" },
 ];
 
-// DEFAULT_TYPO only controls the editor body — title is always DM Mono
-const DEFAULT_TYPO = { font: "'DM Mono', monospace", size: "15px", theme: THEMES[0] };
+const ZOOM_LEVELS = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
+
+const DEFAULT_TYPO = { font: "'DM Mono', monospace", size: "15px", theme: THEMES[0], zoom: 1.0 };
 const AUTOSAVE_DELAY = 2000;
 
 function randomQuote() { return QUOTES[Math.floor(Math.random() * QUOTES.length)]; }
@@ -162,7 +160,6 @@ function ToolDivider({ isLightTheme }) {
   return <div style={{ width: 1, height: 18, background: isLightTheme ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.08)", margin: "0 2px", flexShrink: 0 }} />;
 }
 
-// FontSelect — applies font-family ONLY to highlighted text via mark command
 function FontSelect({ typoFont, onTypoChange, editor, isLightTheme }) {
   return (
     <select
@@ -170,8 +167,8 @@ function FontSelect({ typoFont, onTypoChange, editor, isLightTheme }) {
       onMouseDown={(e) => e.stopPropagation()}
       onChange={(e) => {
         const v = e.target.value;
-        onTypoChange(v);                               // update base CSS for new unformatted text
-        editor?.chain().focus().setFontFamily(v).run(); // apply mark to current selection only
+        onTypoChange(v);
+        editor?.chain().focus().setFontFamily(v).run();
       }}
       className="font-mono text-[11px] rounded-md px-1 focus:outline-none cursor-pointer"
       style={{ background: isLightTheme ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)", border: isLightTheme ? "1px solid rgba(0,0,0,0.1)" : "1px solid rgba(255,255,255,0.1)", color: isLightTheme ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.5)", height: 28, maxWidth: 80 }}
@@ -181,8 +178,6 @@ function FontSelect({ typoFont, onTypoChange, editor, isLightTheme }) {
   );
 }
 
-// FontSizeSelect — applies font-size ONLY to highlighted text via mark command
-// Does NOT update typo.size so the editor base size never changes
 function FontSizeSelect({ typoSize, editor, isLightTheme }) {
   return (
     <select
@@ -190,8 +185,6 @@ function FontSizeSelect({ typoSize, editor, isLightTheme }) {
       onMouseDown={(e) => e.stopPropagation()}
       onChange={(e) => {
         const v = e.target.value;
-        // Only apply to selection — do NOT call onTypoChange for size
-        // so the base editor font-size stays unchanged
         editor?.chain().focus().setFontSize(v).run();
       }}
       className="font-mono text-[11px] rounded-md px-1 focus:outline-none cursor-pointer"
@@ -199,6 +192,44 @@ function FontSizeSelect({ typoSize, editor, isLightTheme }) {
     >
       {FONT_SIZES.map((s) => <option key={s} value={s} style={{ background: "#111" }}>{s}</option>)}
     </select>
+  );
+}
+
+// ── Zoom Control ──────────────────────────────────────────────────────────────
+
+function ZoomControl({ zoom, onZoomChange, isLightTheme }) {
+  const idx = ZOOM_LEVELS.indexOf(zoom);
+  const canZoomOut = idx > 0;
+  const canZoomIn  = idx < ZOOM_LEVELS.length - 1;
+
+  return (
+    <div className="flex items-center gap-0.5">
+      <ToolBtn
+        onClick={() => canZoomOut && onZoomChange(ZOOM_LEVELS[idx - 1])}
+        active={false}
+        title="Zoom out"
+        isLightTheme={isLightTheme}
+      >
+        <span style={{ fontSize: 15, fontWeight: 400, lineHeight: 1, marginTop: -1 }}>−</span>
+      </ToolBtn>
+      <span
+        className="font-mono text-[10px] tracking-widest text-center select-none"
+        style={{
+          width: 36,
+          color: isLightTheme ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.4)",
+        }}
+      >
+        {Math.round(zoom * 100)}%
+      </span>
+      <ToolBtn
+        onClick={() => canZoomIn && onZoomChange(ZOOM_LEVELS[idx + 1])}
+        active={false}
+        title="Zoom in"
+        isLightTheme={isLightTheme}
+      >
+        <span style={{ fontSize: 15, fontWeight: 400, lineHeight: 1, marginTop: -1 }}>+</span>
+      </ToolBtn>
+    </div>
   );
 }
 
@@ -236,6 +267,7 @@ function FormattingBar({ editor, typo, onTypoChange, bgColor, isLightTheme }) {
       <ToolDivider isLightTheme={isLightTheme} />
       <ToolBtn onClick={() => editor.chain().focus().setHorizontalRule().run()}                     active={false}                                     title="Divider" isLightTheme={isLightTheme}><Minus size={13} /></ToolBtn>
       <ToolDivider isLightTheme={isLightTheme} />
+      {/* Theme swatches */}
       <div className="flex items-center gap-1 ml-1">
         {THEMES.map((t) => (
           <button
@@ -251,6 +283,13 @@ function FormattingBar({ editor, typo, onTypoChange, bgColor, isLightTheme }) {
           />
         ))}
       </div>
+      <ToolDivider isLightTheme={isLightTheme} />
+      {/* Zoom control */}
+      <ZoomControl
+        zoom={typo.zoom}
+        onZoomChange={(z) => onTypoChange({ ...typo, zoom: z })}
+        isLightTheme={isLightTheme}
+      />
     </div>
   );
 }
@@ -378,19 +417,23 @@ function JournalEditor({ journal, onClose }) {
   const blockquoteColor = isLightTheme ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.4)";
   const blockquoteBorder = isLightTheme ? "rgba(212,165,116,0.35)" : "rgba(200,240,76,0.35)";
 
+  // For zoom < 1, we need to compensate the lost height so the page doesn't
+  // appear cropped. For zoom > 1, we add extra bottom margin so content isn't clipped.
+  const zoomCompensation = typo.zoom !== 1.0
+    ? `calc((${typo.zoom} - 1) * 60vh)`
+    : undefined;
+
   return (
     <div className="flex flex-col transition-colors duration-300" style={{ background: typo.theme.bg, minHeight: "100vh" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap');
 
-        /* Title input — always DM Mono, never affected by typo state */
         .chalk-title {
           font-family: 'DM Mono', monospace !important;
           font-size: 1.5rem !important;
           color: ${isLightTheme ? "#2a2a2a" : "rgba(255,255,255,0.9)"} !important;
         }
 
-        /* Editor body — base font controlled by typo state */
         .chalk-editor {
           font-family: ${typo.font};
           font-size: ${typo.size};
@@ -415,12 +458,9 @@ function JournalEditor({ journal, onClose }) {
         .chalk-editor strong { color: ${isLightTheme ? "#1a1a1a" : "rgba(255,255,255,0.95)"}; font-weight: 600; }
         .chalk-editor em { font-style: italic; }
         .chalk-editor u { text-decoration: underline; text-underline-offset: 3px; }
-
-        /* Inline marks — must use !important so they override the base editor CSS */
         .chalk-editor span[style*="font-family"] { font-family: inherit; }
         .chalk-editor span[style*="font-size"] { font-size: inherit; }
         .chalk-editor span[style] { font-family: unset; font-size: unset; }
-
         .chalk-editor .is-editor-empty:first-child::before,
         .chalk-editor .is-empty::before { content: attr(data-placeholder); color: ${placeholderColor}; pointer-events: none; float: left; height: 0; }
         .chalk-editor ::selection { background: ${isLightTheme ? "rgba(212,165,116,0.2)" : "rgba(200,240,76,0.2)"}; }
@@ -447,9 +487,16 @@ function JournalEditor({ journal, onClose }) {
       {/* Formatting bar */}
       <FormattingBar editor={editor} typo={typo} onTypoChange={setTypo} bgColor={typo.theme.bg} isLightTheme={isLightTheme} />
 
-      {/* Editor body */}
-      <div className="max-w-2xl mx-auto w-full px-6 py-10">
-        {/* Title — hardcoded to DM Mono via chalk-title class, never changes */}
+      {/* Editor body — zoom applied here only, toolbar/topbar unaffected */}
+      <div
+        className="max-w-2xl mx-auto w-full px-6 py-10"
+        style={{
+          transform: `scale(${typo.zoom})`,
+          transformOrigin: "top center",
+          marginBottom: zoomCompensation,
+        }}
+      >
+        {/* Title — hardcoded to DM Mono via chalk-title class */}
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
