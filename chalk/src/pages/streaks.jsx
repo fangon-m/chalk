@@ -558,30 +558,37 @@ export default function Streaks() {
   const [todayMap, setTodayMap] = useState({});
 
   const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await getStreaks();
-      setStreaks(data || []);
-
-      const today = new Date().toISOString().slice(0, 10);
-      const checks = await Promise.all(
-        (data || []).map((s) =>
-          supabase
-            .from("streak_logs")
-            .select("id")
-            .eq("streak_id", s.id)
-            .eq("date", today)
-            .maybeSingle()
-            .then(({ data: row }) => [s.id, !!row])
-        )
-      );
-      setTodayMap(Object.fromEntries(checks));
-    } catch (e) {
-      setPageError(e.message);
-    } finally {
-      setLoading(false);
+  setLoading(true);
+  try {
+    // ── Only run handle_missed_streaks once per day ──
+    const today = new Date().toISOString().slice(0, 10);
+    const lastRun = localStorage.getItem("chalk_missed_streaks_date");
+    if (lastRun !== today) {
+      await supabase.rpc("handle_missed_streaks");
+      localStorage.setItem("chalk_missed_streaks_date", today);
     }
-  }, []);
+
+    const data = await getStreaks();
+    setStreaks(data || []);
+
+    const checks = await Promise.all(
+      (data || []).map((s) =>
+        supabase
+          .from("streak_logs")
+          .select("id")
+          .eq("streak_id", s.id)
+          .eq("date", today)
+          .maybeSingle()
+          .then(({ data: row }) => [s.id, !!row])
+      )
+    );
+    setTodayMap(Object.fromEntries(checks));
+  } catch (e) {
+    setPageError(e.message);
+  } finally {
+    setLoading(false);
+  }
+}, []);
 
   useEffect(() => { load(); }, [load]);
 
