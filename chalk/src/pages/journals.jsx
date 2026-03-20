@@ -119,11 +119,11 @@ function excerpt(content, len = 120) {
 
 function SaveIndicator({ status, isLightTheme }) {
   const configs = {
-    idle:    { icon: <Cloud size={14} />,                            label: "All changes saved", color: isLightTheme ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.15)" },
+    idle:    { icon: <Cloud size={14} />,                            label: "All changes saved", color: isLightTheme ? "rgba(0,0,0,0.2)"  : "rgba(255,255,255,0.15)" },
     unsaved: { icon: <CloudUpload size={14} />,                      label: "Unsaved changes",   color: isLightTheme ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.35)" },
-    saving:  { icon: <Loader2 size={14} className="animate-spin" />, label: "Saving…",           color: isLightTheme ? "rgba(0,0,0,0.3)" : "rgba(255,255,255,0.3)"  },
-    saved:   { icon: <Cloud size={14} />,                            label: "Saved",             color: isLightTheme ? "#8b5a3c" : "rgba(200,240,76,0.7)"   },
-    error:   { icon: <CloudOff size={14} />,                         label: "Save failed",       color: "#ef4444"                },
+    saving:  { icon: <Loader2 size={14} className="animate-spin" />, label: "Saving…",           color: isLightTheme ? "rgba(0,0,0,0.3)"  : "rgba(255,255,255,0.3)"  },
+    saved:   { icon: <Cloud size={14} />,                            label: "Saved",             color: isLightTheme ? "#8b5a3c"          : "rgba(200,240,76,0.7)"   },
+    error:   { icon: <CloudOff size={14} />,                         label: "Save failed",       color: "#ef4444" },
   };
   const cfg = configs[status];
   if (!cfg) return null;
@@ -144,11 +144,10 @@ function ToolBtn({ onClick, active, title, children, isLightTheme }) {
       title={title}
       className="flex items-center justify-center rounded-md transition-all"
       style={{
-        width: 28, height: 28, flexShrink: 0,
+        width: 28, height: 28, flexShrink: 0, cursor: "pointer",
         background: active ? isLightTheme ? "rgba(212,165,116,0.15)" : "rgba(200,240,76,0.15)" : "transparent",
         color: active ? isLightTheme ? "#8b5a3c" : "#c8f04c" : isLightTheme ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.45)",
         border: active ? isLightTheme ? "1px solid rgba(212,165,116,0.25)" : "1px solid rgba(200,240,76,0.25)" : "1px solid transparent",
-        cursor: "pointer",
       }}
     >
       {children}
@@ -160,35 +159,53 @@ function ToolDivider({ isLightTheme }) {
   return <div style={{ width: 1, height: 18, background: isLightTheme ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.08)", margin: "0 2px", flexShrink: 0 }} />;
 }
 
+// FontSelect — shows the active font family at cursor, falls back to typoFont
 function FontSelect({ typoFont, onTypoChange, editor, isLightTheme }) {
+  // Read the mark at the current cursor/selection position
+  const activeFont = editor?.getAttributes("fontFamily")?.fontFamily || typoFont;
+
   return (
     <select
-      value={typoFont}
+      value={activeFont}
       onMouseDown={(e) => e.stopPropagation()}
       onChange={(e) => {
         const v = e.target.value;
-        onTypoChange(v);
-        editor?.chain().focus().setFontFamily(v).run();
+        onTypoChange(v);                                // update base CSS default
+        editor?.chain().focus().setFontFamily(v).run(); // apply to selection
       }}
       className="font-mono text-[11px] rounded-md px-1 focus:outline-none cursor-pointer"
-      style={{ background: isLightTheme ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)", border: isLightTheme ? "1px solid rgba(0,0,0,0.1)" : "1px solid rgba(255,255,255,0.1)", color: isLightTheme ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.5)", height: 28, maxWidth: 80 }}
+      style={{
+        background: isLightTheme ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)",
+        border: isLightTheme ? "1px solid rgba(0,0,0,0.1)" : "1px solid rgba(255,255,255,0.1)",
+        color: isLightTheme ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.5)",
+        height: 28, maxWidth: 80,
+      }}
     >
       {FONTS.map((f) => <option key={f.value} value={f.value} style={{ background: "#111" }}>{f.label}</option>)}
     </select>
   );
 }
 
+// FontSizeSelect — shows the active font size at cursor, falls back to typoSize
 function FontSizeSelect({ typoSize, editor, isLightTheme }) {
+  // Read the fontSize mark at the current cursor/selection position
+  const activeSize = editor?.getAttributes("fontSize")?.fontSize || typoSize;
+
   return (
     <select
-      value={typoSize}
+      value={activeSize}
       onMouseDown={(e) => e.stopPropagation()}
       onChange={(e) => {
         const v = e.target.value;
-        editor?.chain().focus().setFontSize(v).run();
+        editor?.chain().focus().setFontSize(v).run(); // apply to selection only
       }}
       className="font-mono text-[11px] rounded-md px-1 focus:outline-none cursor-pointer"
-      style={{ background: isLightTheme ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)", border: isLightTheme ? "1px solid rgba(0,0,0,0.1)" : "1px solid rgba(255,255,255,0.1)", color: isLightTheme ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.5)", height: 28 }}
+      style={{
+        background: isLightTheme ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)",
+        border: isLightTheme ? "1px solid rgba(0,0,0,0.1)" : "1px solid rgba(255,255,255,0.1)",
+        color: isLightTheme ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.5)",
+        height: 28,
+      }}
     >
       {FONT_SIZES.map((s) => <option key={s} value={s} style={{ background: "#111" }}>{s}</option>)}
     </select>
@@ -204,29 +221,13 @@ function ZoomControl({ zoom, onZoomChange, isLightTheme }) {
 
   return (
     <div className="flex items-center gap-0.5">
-      <ToolBtn
-        onClick={() => canZoomOut && onZoomChange(ZOOM_LEVELS[idx - 1])}
-        active={false}
-        title="Zoom out"
-        isLightTheme={isLightTheme}
-      >
+      <ToolBtn onClick={() => canZoomOut && onZoomChange(ZOOM_LEVELS[idx - 1])} active={false} title="Zoom out" isLightTheme={isLightTheme}>
         <span style={{ fontSize: 15, fontWeight: 400, lineHeight: 1, marginTop: -1 }}>−</span>
       </ToolBtn>
-      <span
-        className="font-mono text-[10px] tracking-widest text-center select-none"
-        style={{
-          width: 36,
-          color: isLightTheme ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.4)",
-        }}
-      >
+      <span className="font-mono text-[10px] tracking-widest text-center select-none" style={{ width: 36, color: isLightTheme ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.4)" }}>
         {Math.round(zoom * 100)}%
       </span>
-      <ToolBtn
-        onClick={() => canZoomIn && onZoomChange(ZOOM_LEVELS[idx + 1])}
-        active={false}
-        title="Zoom in"
-        isLightTheme={isLightTheme}
-      >
+      <ToolBtn onClick={() => canZoomIn && onZoomChange(ZOOM_LEVELS[idx + 1])} active={false} title="Zoom in" isLightTheme={isLightTheme}>
         <span style={{ fontSize: 15, fontWeight: 400, lineHeight: 1, marginTop: -1 }}>+</span>
       </ToolBtn>
     </div>
@@ -242,32 +243,31 @@ function FormattingBar({ editor, typo, onTypoChange, bgColor, isLightTheme }) {
       className="sticky z-10 flex items-center gap-1 px-4 py-2 flex-wrap"
       style={{ top: 57, background: bgColor, borderBottom: isLightTheme ? "1px solid rgba(0,0,0,0.1)" : "1px solid rgba(255,255,255,0.06)" }}
     >
-      <ToolBtn onClick={() => editor.chain().focus().undo().run()}                            active={false}                                     title="Undo" isLightTheme={isLightTheme}><Undo size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().redo().run()}                            active={false}                                     title="Redo" isLightTheme={isLightTheme}><Redo size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().undo().run()} active={false} title="Undo" isLightTheme={isLightTheme}><Undo size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().redo().run()} active={false} title="Redo" isLightTheme={isLightTheme}><Redo size={13} /></ToolBtn>
       <ToolDivider isLightTheme={isLightTheme} />
       <FontSelect typoFont={typo.font} onTypoChange={(v) => onTypoChange({ ...typo, font: v })} editor={editor} isLightTheme={isLightTheme} />
       <FontSizeSelect typoSize={typo.size} editor={editor} isLightTheme={isLightTheme} />
       <ToolDivider isLightTheme={isLightTheme} />
-      <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()}                            active={editor.isActive("bold")}                   title="Bold" isLightTheme={isLightTheme}><Bold size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleItalic().run()}                          active={editor.isActive("italic")}                 title="Italic" isLightTheme={isLightTheme}><Italic size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleUnderline().run()}                       active={editor.isActive("underline")}              title="Underline" isLightTheme={isLightTheme}><UnderlineIcon size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleCode().run()}                            active={editor.isActive("code")}                   title="Code" isLightTheme={isLightTheme}><Code size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()}                            active={editor.isActive("bold")}                   title="Bold"          isLightTheme={isLightTheme}><Bold size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleItalic().run()}                          active={editor.isActive("italic")}                 title="Italic"        isLightTheme={isLightTheme}><Italic size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleUnderline().run()}                       active={editor.isActive("underline")}              title="Underline"     isLightTheme={isLightTheme}><UnderlineIcon size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleCode().run()}                            active={editor.isActive("code")}                   title="Code"          isLightTheme={isLightTheme}><Code size={13} /></ToolBtn>
       <ToolDivider isLightTheme={isLightTheme} />
-      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}             active={editor.isActive("heading", { level: 1 })} title="Heading 1" isLightTheme={isLightTheme}><Heading1 size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}             active={editor.isActive("heading", { level: 2 })} title="Heading 2" isLightTheme={isLightTheme}><Heading2 size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}             active={editor.isActive("heading", { level: 1 })} title="Heading 1"     isLightTheme={isLightTheme}><Heading1 size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}             active={editor.isActive("heading", { level: 2 })} title="Heading 2"     isLightTheme={isLightTheme}><Heading2 size={13} /></ToolBtn>
       <ToolDivider isLightTheme={isLightTheme} />
-      <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()}                      active={editor.isActive("bulletList")}             title="Bullet list" isLightTheme={isLightTheme}><List size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()}                      active={editor.isActive("bulletList")}             title="Bullet list"   isLightTheme={isLightTheme}><List size={13} /></ToolBtn>
       <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()}                     active={editor.isActive("orderedList")}            title="Numbered list" isLightTheme={isLightTheme}><ListOrdered size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleBlockquote().run()}                      active={editor.isActive("blockquote")}             title="Blockquote" isLightTheme={isLightTheme}><Quote size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleBlockquote().run()}                      active={editor.isActive("blockquote")}             title="Blockquote"    isLightTheme={isLightTheme}><Quote size={13} /></ToolBtn>
       <ToolDivider isLightTheme={isLightTheme} />
-      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("left").run()}                    active={editor.isActive({ textAlign: "left" })}    title="Left" isLightTheme={isLightTheme}><AlignLeft size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("center").run()}                  active={editor.isActive({ textAlign: "center" })}  title="Center" isLightTheme={isLightTheme}><AlignCenter size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("right").run()}                   active={editor.isActive({ textAlign: "right" })}   title="Right" isLightTheme={isLightTheme}><AlignRight size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("justify").run()}                 active={editor.isActive({ textAlign: "justify" })} title="Justify" isLightTheme={isLightTheme}><AlignJustify size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("left").run()}                    active={editor.isActive({ textAlign: "left" })}    title="Left"          isLightTheme={isLightTheme}><AlignLeft size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("center").run()}                  active={editor.isActive({ textAlign: "center" })}  title="Center"        isLightTheme={isLightTheme}><AlignCenter size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("right").run()}                   active={editor.isActive({ textAlign: "right" })}   title="Right"         isLightTheme={isLightTheme}><AlignRight size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("justify").run()}                 active={editor.isActive({ textAlign: "justify" })} title="Justify"       isLightTheme={isLightTheme}><AlignJustify size={13} /></ToolBtn>
       <ToolDivider isLightTheme={isLightTheme} />
-      <ToolBtn onClick={() => editor.chain().focus().setHorizontalRule().run()}                     active={false}                                     title="Divider" isLightTheme={isLightTheme}><Minus size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().setHorizontalRule().run()}                     active={false}                                     title="Divider"       isLightTheme={isLightTheme}><Minus size={13} /></ToolBtn>
       <ToolDivider isLightTheme={isLightTheme} />
-      {/* Theme swatches */}
       <div className="flex items-center gap-1 ml-1">
         {THEMES.map((t) => (
           <button
@@ -278,18 +278,15 @@ function FormattingBar({ editor, typo, onTypoChange, bgColor, isLightTheme }) {
             style={{
               width: 18, height: 18,
               background: t.bg,
-              border: typo.theme.label === t.label ? isLightTheme ? "1.5px solid #8b5a3c" : "1.5px solid #c8f04c" : isLightTheme ? "1.5px solid rgba(0,0,0,0.25)" : "1.5px solid rgba(255,255,255,0.15)",
+              border: typo.theme.label === t.label
+                ? isLightTheme ? "1.5px solid #8b5a3c" : "1.5px solid #c8f04c"
+                : isLightTheme ? "1.5px solid rgba(0,0,0,0.25)" : "1.5px solid rgba(255,255,255,0.15)",
             }}
           />
         ))}
       </div>
       <ToolDivider isLightTheme={isLightTheme} />
-      {/* Zoom control */}
-      <ZoomControl
-        zoom={typo.zoom}
-        onZoomChange={(z) => onTypoChange({ ...typo, zoom: z })}
-        isLightTheme={isLightTheme}
-      />
+      <ZoomControl zoom={typo.zoom} onZoomChange={(z) => onTypoChange({ ...typo, zoom: z })} isLightTheme={isLightTheme} />
     </div>
   );
 }
@@ -323,7 +320,7 @@ function JournalEditor({ journal, onClose }) {
   const [typo, setTypo] = useState(DEFAULT_TYPO);
   const [, forceUpdate] = useState(0);
 
-  const journalIdRef     = useRef(journal?.id || null);
+  const journalIdRef    = useRef(journal?.id || null);
   const autosaveTimerRef = useRef(null);
   const savedTimerRef    = useRef(null);
   const editorReadyRef   = useRef(false);
@@ -355,6 +352,7 @@ function JournalEditor({ journal, onClose }) {
       scheduleAutosave();
     },
     onSelectionUpdate: () => {
+      // Force re-render so FontSelect and FontSizeSelect re-read getAttributes()
       forceUpdate(n => n + 1);
     },
   });
@@ -407,21 +405,17 @@ function JournalEditor({ journal, onClose }) {
     }
   }
 
-  const isLightTheme = typo.theme.label === "White" || typo.theme.label === "Beige" || typo.theme.label === "Stone" || typo.theme.label === "Ash";
-  const textColor = isLightTheme ? "#2a2a2a" : "rgba(255,255,255,0.78)";
-  const headingColor = isLightTheme ? "#1a1a1a" : "rgba(255,255,255,0.95)";
-  const placeholderColor = isLightTheme ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.15)";
-  const caretColor = isLightTheme ? "#d4a574" : "#c8f04c";
-  const codeBackground = isLightTheme ? "rgba(212,165,116,0.1)" : "rgba(200,240,76,0.08)";
-  const codeColor = isLightTheme ? "#8b5a3c" : "#c8f04c";
-  const blockquoteColor = isLightTheme ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.4)";
-  const blockquoteBorder = isLightTheme ? "rgba(212,165,116,0.35)" : "rgba(200,240,76,0.35)";
+  const isLightTheme = ["White", "Beige", "Stone", "Ash"].includes(typo.theme.label);
+  const textColor      = isLightTheme ? "#2a2a2a"                     : "rgba(255,255,255,0.78)";
+  const headingColor   = isLightTheme ? "#1a1a1a"                     : "rgba(255,255,255,0.95)";
+  const placeholderColor = isLightTheme ? "rgba(0,0,0,0.2)"           : "rgba(255,255,255,0.15)";
+  const caretColor     = isLightTheme ? "#d4a574"                     : "#c8f04c";
+  const codeBackground = isLightTheme ? "rgba(212,165,116,0.1)"       : "rgba(200,240,76,0.08)";
+  const codeColor      = isLightTheme ? "#8b5a3c"                     : "#c8f04c";
+  const blockquoteColor  = isLightTheme ? "rgba(0,0,0,0.4)"           : "rgba(255,255,255,0.4)";
+  const blockquoteBorder = isLightTheme ? "rgba(212,165,116,0.35)"    : "rgba(200,240,76,0.35)";
 
-  // For zoom < 1, we need to compensate the lost height so the page doesn't
-  // appear cropped. For zoom > 1, we add extra bottom margin so content isn't clipped.
-  const zoomCompensation = typo.zoom !== 1.0
-    ? `calc((${typo.zoom} - 1) * 60vh)`
-    : undefined;
+  const zoomCompensation = typo.zoom !== 1.0 ? `calc((${typo.zoom} - 1) * 60vh)` : undefined;
 
   return (
     <div className="flex flex-col transition-colors duration-300" style={{ background: typo.theme.bg, minHeight: "100vh" }}>
@@ -458,9 +452,6 @@ function JournalEditor({ journal, onClose }) {
         .chalk-editor strong { color: ${isLightTheme ? "#1a1a1a" : "rgba(255,255,255,0.95)"}; font-weight: 600; }
         .chalk-editor em { font-style: italic; }
         .chalk-editor u { text-decoration: underline; text-underline-offset: 3px; }
-        .chalk-editor span[style*="font-family"] { font-family: inherit; }
-        .chalk-editor span[style*="font-size"] { font-size: inherit; }
-        .chalk-editor span[style] { font-family: unset; font-size: unset; }
         .chalk-editor .is-editor-empty:first-child::before,
         .chalk-editor .is-empty::before { content: attr(data-placeholder); color: ${placeholderColor}; pointer-events: none; float: left; height: 0; }
         .chalk-editor ::selection { background: ${isLightTheme ? "rgba(212,165,116,0.2)" : "rgba(200,240,76,0.2)"}; }
@@ -487,22 +478,17 @@ function JournalEditor({ journal, onClose }) {
       {/* Formatting bar */}
       <FormattingBar editor={editor} typo={typo} onTypoChange={setTypo} bgColor={typo.theme.bg} isLightTheme={isLightTheme} />
 
-      {/* Editor body — zoom applied here only, toolbar/topbar unaffected */}
+      {/* Editor body */}
       <div
         className="max-w-2xl mx-auto w-full px-6 py-10"
-        style={{
-          transform: `scale(${typo.zoom})`,
-          transformOrigin: "top center",
-          marginBottom: zoomCompensation,
-        }}
+        style={{ transform: `scale(${typo.zoom})`, transformOrigin: "top center", marginBottom: zoomCompensation }}
       >
-        {/* Title — hardcoded to DM Mono via chalk-title class */}
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Entry title (optional)"
           className="chalk-title w-full bg-transparent focus:outline-none mb-6 border-none"
-          style={{ color: isLightTheme ? "#2a2a2a" : "rgba(255,255,255,0.9)", caretColor: caretColor }}
+          style={{ caretColor }}
         />
 
         <div className="flex items-center gap-3 mb-8">
