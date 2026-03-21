@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   BarChart2, Shield, Flame, Award, Star,
-  AlertTriangle, X, Loader2, CheckCircle2,
+  AlertTriangle, X, CheckCircle2, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -13,7 +13,7 @@ function getMonthRange() {
   const month = now.getMonth();
   const firstDay = new Date(year, month, 1).toISOString().slice(0, 10);
   const today = now.toISOString().slice(0, 10);
-  const daysElapsed = now.getDate(); // 1-based, so day 1 = 1 day elapsed
+  const daysElapsed = now.getDate();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const monthName = now.toLocaleString("en-US", { month: "long" });
   return { firstDay, today, daysElapsed, daysInMonth, monthName, year };
@@ -25,6 +25,40 @@ function getFlameColor(count) {
   if (count >= 11) return "#f97316";
   if (count >= 3)  return "#eab308";
   return "#6b7280";
+}
+
+// ── Collapsible Section ───────────────────────────────────────────────────────
+
+function CollapsibleSection({ title, subtitle, children, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  return (
+    <div
+      className="rounded-2xl border overflow-hidden mb-4"
+      style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)" }}
+    >
+      {/* Header — clickable */}
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-5 py-4 transition-colors hover:bg-white/3 cursor-pointer"
+        style={{ borderBottom: open ? "1px solid rgba(255,255,255,0.06)" : "none" }}
+      >
+        <div className="flex items-center gap-3">
+          <p className="font-mono text-[10px] tracking-widest text-white/30 uppercase">{title}</p>
+          {subtitle && (
+            <span className="font-mono text-[10px] text-white/20">{subtitle}</span>
+          )}
+        </div>
+        {open
+          ? <ChevronUp size={13} className="text-white/25" />
+          : <ChevronDown size={13} className="text-white/25" />
+        }
+      </button>
+
+      {/* Content */}
+      {open && children}
+    </div>
+  );
 }
 
 // ── Honor Award Modal ─────────────────────────────────────────────────────────
@@ -41,7 +75,6 @@ function HonorAward({ monthName, year, onClose }) {
         style={{ background: "#111", borderColor: "rgba(200,240,76,0.3)", boxShadow: "0 0 60px rgba(200,240,76,0.08)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Award icon */}
         <div
           className="w-20 h-20 rounded-full flex items-center justify-center mb-6"
           style={{ background: "rgba(200,240,76,0.08)", border: "2px solid rgba(200,240,76,0.3)" }}
@@ -49,20 +82,15 @@ function HonorAward({ monthName, year, onClose }) {
           <Award size={36} style={{ color: "#c8f04c" }} />
         </div>
 
-        <p className="font-mono text-[10px] tracking-widest text-white/30 uppercase mb-2">
-          Honor Award
-        </p>
+        <p className="font-mono text-[10px] tracking-widest text-white/30 uppercase mb-2">Honor Award</p>
         <h2 className="font-mono text-2xl text-white mb-2">Perfect Month</h2>
-        <p className="font-mono text-sm text-white/50 mb-1">
-          {monthName} {year}
-        </p>
+        <p className="font-mono text-sm text-white/50 mb-1">{monthName} {year}</p>
         <p className="font-mono text-xs text-white/30 leading-relaxed mb-8 max-w-xs">
           You checked in every streak for the entire month. That's extraordinary discipline.
         </p>
 
-        {/* Stars */}
         <div className="flex items-center gap-2 mb-8">
-          {[0,1,2].map(i => (
+          {[0, 1, 2].map(i => (
             <Star key={i} size={18} style={{ color: "#c8f04c", fill: "#c8f04c" }} />
           ))}
         </div>
@@ -85,19 +113,16 @@ function LifeScoreRing({ score, isComplete }) {
   const radius = 54;
   const circumference = 2 * Math.PI * radius;
   const filled = (score / 100) * circumference;
-  const color = isComplete ? "#c8f04c" : score >= 75 ? "#c8f04c" : score >= 50 ? "#eab308" : score >= 25 ? "#f97316" : "#6b7280";
+  const color = isComplete ? "#c8f04c"
+    : score >= 75 ? "#c8f04c"
+    : score >= 50 ? "#eab308"
+    : score >= 25 ? "#f97316"
+    : "#6b7280";
 
   return (
     <div className="relative flex items-center justify-center" style={{ width: 140, height: 140 }}>
       <svg width="140" height="140" style={{ transform: "rotate(-90deg)" }}>
-        {/* Track */}
-        <circle
-          cx="70" cy="70" r={radius}
-          fill="none"
-          stroke="rgba(255,255,255,0.06)"
-          strokeWidth="8"
-        />
-        {/* Progress */}
+        <circle cx="70" cy="70" r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
         <circle
           cx="70" cy="70" r={radius}
           fill="none"
@@ -108,7 +133,6 @@ function LifeScoreRing({ score, isComplete }) {
           style={{ transition: "stroke-dasharray 1s ease" }}
         />
       </svg>
-      {/* Center text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         {isComplete ? (
           <Award size={28} style={{ color: "#c8f04c" }} />
@@ -127,7 +151,10 @@ function LifeScoreRing({ score, isComplete }) {
 
 function StreakStatRow({ streak, checkedInDays, daysElapsed }) {
   const consistency = daysElapsed > 0 ? Math.round((checkedInDays / daysElapsed) * 100) : 0;
-  const barColor = consistency === 100 ? "#c8f04c" : consistency >= 75 ? "#eab308" : consistency >= 50 ? "#f97316" : "#6b7280";
+  const barColor = consistency === 100 ? "#c8f04c"
+    : consistency >= 75 ? "#eab308"
+    : consistency >= 50 ? "#f97316"
+    : "#6b7280";
 
   return (
     <div className="flex items-center gap-4 py-3 border-b border-white/6 last:border-none">
@@ -136,7 +163,6 @@ function StreakStatRow({ streak, checkedInDays, daysElapsed }) {
         <span className="font-mono text-xs text-white truncate">{streak.name}</span>
       </div>
       <div className="flex items-center gap-3 shrink-0">
-        {/* Mini progress bar */}
         <div className="w-20 h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
           <div
             className="h-full rounded-full transition-all duration-700"
@@ -146,14 +172,10 @@ function StreakStatRow({ streak, checkedInDays, daysElapsed }) {
         <span className="font-mono text-[11px] w-8 text-right" style={{ color: barColor }}>
           {consistency}%
         </span>
-        {/* Check-in count */}
         <span className="font-mono text-[10px] text-white/25 w-14 text-right">
           {checkedInDays}/{daysElapsed}d
         </span>
-        {/* Perfect badge */}
-        {consistency === 100 && (
-          <CheckCircle2 size={12} style={{ color: "#c8f04c" }} />
-        )}
+        {consistency === 100 && <CheckCircle2 size={12} style={{ color: "#c8f04c" }} />}
       </div>
     </div>
   );
@@ -165,7 +187,7 @@ export default function Stats() {
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
   const [streaks, setStreaks] = useState([]);
-  const [streakLogs, setStreakLogs] = useState({}); // streakId -> Set of dates
+  const [streakLogs, setStreakLogs] = useState({});
   const [showAward, setShowAward] = useState(false);
   const [awardSeen, setAwardSeen] = useState(false);
 
@@ -175,14 +197,12 @@ export default function Stats() {
     setLoading(true);
     setPageError("");
     try {
-      // Fetch all streaks
       const { data: streakData, error: streakErr } = await supabase
         .from("streaks")
         .select("*")
         .order("created_at", { ascending: true });
       if (streakErr) throw streakErr;
 
-      // Fetch all streak_logs for this month
       const { data: logsData, error: logsErr } = await supabase
         .from("streak_logs")
         .select("streak_id, date")
@@ -190,7 +210,6 @@ export default function Stats() {
         .lte("date", today);
       if (logsErr) throw logsErr;
 
-      // Build map: streakId -> Set of dates checked in this month
       const logsMap = {};
       for (const log of logsData || []) {
         if (!logsMap[log.streak_id]) logsMap[log.streak_id] = new Set();
@@ -208,11 +227,6 @@ export default function Stats() {
 
   useEffect(() => { load(); }, [load]);
 
-  // ── Life Score calculation ──────────────────────────────────────────────────
-  // For each streak: consistency = days checked in this month / days elapsed
-  // Life score = average consistency across all streaks × 100
-  // If no streaks, score = 0
-
   const streakConsistencies = streaks.map((s) => {
     const checkedIn = streakLogs[s.id]?.size ?? 0;
     return daysElapsed > 0 ? checkedIn / daysElapsed : 0;
@@ -223,17 +237,15 @@ export default function Stats() {
     : 0;
 
   const isComplete = lifeScore === 100;
+  const monthProgress = Math.round((daysElapsed / daysInMonth) * 100);
+  const perfectCount = streaks.filter((_, i) => Math.round(streakConsistencies[i] * 100) === 100).length;
 
-  // Show award modal when 100% is reached for the first time this session
   useEffect(() => {
     if (isComplete && !awardSeen && !loading && streaks.length > 0) {
       setShowAward(true);
       setAwardSeen(true);
     }
   }, [isComplete, awardSeen, loading, streaks.length]);
-
-  // Progress through month
-  const monthProgress = Math.round((daysElapsed / daysInMonth) * 100);
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: "#0d0d0d" }}>
@@ -258,9 +270,7 @@ export default function Stats() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <BarChart2 size={14} className="text-[#c8f04c]" />
-              <span className="font-mono text-[11px] tracking-widest text-white/30 uppercase">
-                Chalk / Stats
-              </span>
+              <span className="font-mono text-[11px] tracking-widest text-white/30 uppercase">Chalk / Stats</span>
             </div>
             <h1 className="text-2xl font-mono text-white">Overview</h1>
           </div>
@@ -280,20 +290,13 @@ export default function Stats() {
           className="rounded-2xl border mb-4 overflow-hidden"
           style={{ background: "#111", borderColor: isComplete ? "rgba(200,240,76,0.25)" : "rgba(255,255,255,0.08)" }}
         >
-          {/* Top accent if complete */}
-          {isComplete && (
-            <div className="h-0.5 w-full" style={{ background: "#c8f04c" }} />
-          )}
+          {isComplete && <div className="h-0.5 w-full" style={{ background: "#c8f04c" }} />}
 
           <div className="px-6 py-6">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <p className="font-mono text-[10px] tracking-widest text-white/30 uppercase mb-1">
-                  Life Score
-                </p>
-                <p className="font-mono text-sm text-white/50">
-                  {monthName} {year}
-                </p>
+                <p className="font-mono text-[10px] tracking-widest text-white/30 uppercase mb-1">Life Score</p>
+                <p className="font-mono text-sm text-white/50">{monthName} {year}</p>
               </div>
               {isComplete && (
                 <div
@@ -301,14 +304,11 @@ export default function Stats() {
                   style={{ background: "rgba(200,240,76,0.08)", border: "1px solid rgba(200,240,76,0.2)" }}
                 >
                   <Award size={12} style={{ color: "#c8f04c" }} />
-                  <span className="font-mono text-[10px] tracking-widest" style={{ color: "#c8f04c" }}>
-                    HONOR AWARDED
-                  </span>
+                  <span className="font-mono text-[10px] tracking-widest" style={{ color: "#c8f04c" }}>HONOR AWARDED</span>
                 </div>
               )}
             </div>
 
-            {/* Score ring + stats */}
             <div className="flex items-center gap-8">
               <LifeScoreRing score={lifeScore} isComplete={isComplete} />
 
@@ -320,10 +320,7 @@ export default function Stats() {
                     <span className="font-mono text-[10px] text-white/40">{daysElapsed}/{daysInMonth} days</span>
                   </div>
                   <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
-                    <div
-                      className="h-full rounded-full"
-                      style={{ width: `${monthProgress}%`, background: "rgba(255,255,255,0.2)" }}
-                    />
+                    <div className="h-full rounded-full" style={{ width: `${monthProgress}%`, background: "rgba(255,255,255,0.2)" }} />
                   </div>
                 </div>
 
@@ -335,13 +332,10 @@ export default function Stats() {
                   </div>
                   <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
                     <p className="font-mono text-[9px] tracking-widest text-white/25 uppercase mb-1">Perfect</p>
-                    <p className="font-mono text-xl" style={{ color: "#c8f04c" }}>
-                      {streaks.filter((s, i) => Math.round(streakConsistencies[i] * 100) === 100).length}
-                    </p>
+                    <p className="font-mono text-xl" style={{ color: "#c8f04c" }}>{perfectCount}</p>
                   </div>
                 </div>
 
-                {/* What it takes */}
                 {!isComplete && streaks.length > 0 && (
                   <p className="font-mono text-[10px] text-white/20 leading-relaxed">
                     Check in all streaks daily to reach 100% and earn the Honor Award.
@@ -352,22 +346,9 @@ export default function Stats() {
           </div>
         </div>
 
-        {/* ── Per-streak breakdown ── */}
+        {/* ── Streak Consistency — collapsible ── */}
         {streaks.length > 0 && (
-          <div
-            className="rounded-2xl border overflow-hidden mb-4"
-            style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)" }}
-          >
-            <div className="px-5 py-4 border-b border-white/6">
-              <div className="flex items-center justify-between">
-                <p className="font-mono text-[10px] tracking-widest text-white/30 uppercase">
-                  Streak Consistency
-                </p>
-                <p className="font-mono text-[10px] text-white/20">
-                  This month
-                </p>
-              </div>
-            </div>
+          <CollapsibleSection title="Streak Consistency" subtitle="This month">
             <div className="px-5">
               {streaks.map((streak, i) => (
                 <StreakStatRow
@@ -378,18 +359,12 @@ export default function Stats() {
                 />
               ))}
             </div>
-          </div>
+          </CollapsibleSection>
         )}
 
-        {/* ── Shield summary ── */}
+        {/* ── Shield Status — collapsible ── */}
         {streaks.length > 0 && (
-          <div
-            className="rounded-2xl border overflow-hidden mb-4"
-            style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)" }}
-          >
-            <div className="px-5 py-4 border-b border-white/6">
-              <p className="font-mono text-[10px] tracking-widest text-white/30 uppercase">Shield Status</p>
-            </div>
+          <CollapsibleSection title="Shield Status">
             <div className="px-5 py-4 grid grid-cols-2 gap-3">
               {streaks.map((streak) => (
                 <div
@@ -413,7 +388,7 @@ export default function Stats() {
                 </div>
               ))}
             </div>
-          </div>
+          </CollapsibleSection>
         )}
 
         {/* Empty state */}
@@ -423,13 +398,11 @@ export default function Stats() {
               <BarChart2 size={22} className="text-white/20" />
             </div>
             <p className="font-mono text-white/15 text-[10px] tracking-widest uppercase mb-3">No data yet</p>
-            <p className="font-mono text-white/30 text-sm">
-              Create streaks and start checking in to see your life score.
-            </p>
+            <p className="font-mono text-white/30 text-sm">Create streaks and start checking in to see your life score.</p>
           </div>
         )}
 
-        {/* Honor award button (if earned, always accessible) */}
+        {/* Honor award button */}
         {isComplete && (
           <button
             onClick={() => setShowAward(true)}
@@ -442,13 +415,8 @@ export default function Stats() {
         )}
       </div>
 
-      {/* Honor Award Modal */}
       {showAward && (
-        <HonorAward
-          monthName={monthName}
-          year={year}
-          onClose={() => setShowAward(false)}
-        />
+        <HonorAward monthName={monthName} year={year} onClose={() => setShowAward(false)} />
       )}
     </div>
   );
