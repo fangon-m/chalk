@@ -2,8 +2,53 @@ import { useState, useEffect, useCallback } from "react";
 import {
   BarChart2, Shield, Flame, Award, Star,
   AlertTriangle, X, CheckCircle2, ChevronDown, ChevronUp,
+  Target, Clock,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
+
+// ── Daily Quote ───────────────────────────────────────────────────────────────
+
+const QUOTES = [
+  { text: "We are what we repeatedly do. Excellence, then, is not an act, but a habit.", author: "Aristotle" },
+  { text: "It's not whether you get knocked down; it's whether you get up.", author: "Vince Lombardi" },
+  { text: "Hard work beats talent when talent doesn't work hard.", author: "Tim Notke" },
+  { text: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
+  { text: "You miss 100% of the shots you don't take.", author: "Wayne Gretzky" },
+  { text: "Success is not final, failure is not fatal: it is the courage to continue that counts.", author: "Winston Churchill" },
+  { text: "Champions keep playing until they get it right.", author: "Billie Jean King" },
+  { text: "The difference between ordinary and extraordinary is that little extra.", author: "Jimmy Johnson" },
+  { text: "Without effort, your talent is nothing more than your unmet potential.", author: "Angela Duckworth" },
+  { text: "Do not wait to strike till the iron is hot, but make it hot by striking.", author: "William Butler Yeats" },
+  { text: "You have to believe in yourself when no one else does.", author: "Naomi Osaka" },
+  { text: "Pain is temporary. Quitting lasts forever.", author: "Lance Armstrong" },
+  { text: "The secret of getting ahead is getting started.", author: "Mark Twain" },
+  { text: "You have to expect things of yourself before you can do them.", author: "Michael Jordan" },
+  { text: "Winning isn't everything, but wanting to win is.", author: "Vince Lombardi" },
+  { text: "There are no shortcuts to excellence.", author: "Angela Duckworth" },
+  { text: "It always seems impossible until it's done.", author: "Nelson Mandela" },
+  { text: "Discipline is the bridge between goals and accomplishment.", author: "Jim Rohn" },
+  { text: "The harder the battle, the sweeter the victory.", author: "Les Brown" },
+  { text: "You don't have to be great to start, but you have to start to be great.", author: "Zig Ziglar" },
+  { text: "Push yourself, because no one else is going to do it for you.", author: "Anonymous" },
+  { text: "Done is better than perfect.", author: "Sheryl Sandberg" },
+  { text: "Act as if what you do makes a difference. It does.", author: "William James" },
+  { text: "Believe you can and you're halfway there.", author: "Theodore Roosevelt" },
+  { text: "Energy and persistence conquer all things.", author: "Benjamin Franklin" },
+  { text: "I hated every minute of training, but I said: don't quit. Suffer now and live the rest of your life as a champion.", author: "Muhammad Ali" },
+  { text: "Hard work is worthless for those that don’t believe in themselves.", author: "Uzumaki Naruto" },
+  { text: "Do what you have to do until you can do what you want to do.", author: "Oprah Winfrey" },
+  { text: "My magic is never giving up.", author: "Asta" },
+  { text: "Not everyone who works hard is rewarded. But all those who succeed have worked hard.", author: "Genji Kamogawa" },
+  { text: "There is no tomorrow.", author: "Apollo Creed" },
+  { text: "You before anyone else.", author: "Chalk Dev" },
+];
+
+function getDailyQuote() {
+  const today = new Date();
+  // Use date string as seed so it's the same all day, different tomorrow
+  const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+  return QUOTES[seed % QUOTES.length];
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -27,6 +72,32 @@ function getFlameColor(count) {
   return "#6b7280";
 }
 
+function getPriorityColor(priority) {
+  switch (priority) {
+    case "critical": return "#ef4444";
+    case "high":     return "#f97316";
+    case "medium":   return "#eab308";
+    case "low":      return "#6b7280";
+    default:         return "#c8f04c";
+  }
+}
+
+function getPriorityLabel(priority) {
+  switch (priority) {
+    case "critical": return "CRITICAL";
+    case "high":     return "HIGH";
+    case "medium":   return "MED";
+    case "low":      return "LOW";
+    default:         return "—";
+  }
+}
+
+function daysUntil(iso) {
+  if (!iso) return null;
+  const diff = new Date(iso).getTime() - Date.now();
+  return Math.ceil(diff / 86400000);
+}
+
 // ── Collapsible Section ───────────────────────────────────────────────────────
 
 function CollapsibleSection({ title, subtitle, children, defaultOpen = false }) {
@@ -37,25 +108,20 @@ function CollapsibleSection({ title, subtitle, children, defaultOpen = false }) 
       className="rounded-2xl border overflow-hidden mb-4"
       style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)" }}
     >
-      {/* Header — clickable */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-5 py-4 transition-colors hover:bg-white/3 cursor-pointer"
+        className="w-full flex items-center justify-between px-5 py-4 transition-colors cursor-pointer"
         style={{ borderBottom: open ? "1px solid rgba(255,255,255,0.06)" : "none" }}
       >
         <div className="flex items-center gap-3">
           <p className="font-mono text-[10px] tracking-widest text-white/30 uppercase">{title}</p>
-          {subtitle && (
-            <span className="font-mono text-[10px] text-white/20">{subtitle}</span>
-          )}
+          {subtitle && <span className="font-mono text-[10px] text-white/20">{subtitle}</span>}
         </div>
         {open
           ? <ChevronUp size={13} className="text-white/25" />
           : <ChevronDown size={13} className="text-white/25" />
         }
       </button>
-
-      {/* Content */}
       {open && children}
     </div>
   );
@@ -81,20 +147,17 @@ function HonorAward({ monthName, year, onClose }) {
         >
           <Award size={36} style={{ color: "#c8f04c" }} />
         </div>
-
         <p className="font-mono text-[10px] tracking-widest text-white/30 uppercase mb-2">Honor Award</p>
         <h2 className="font-mono text-2xl text-white mb-2">Perfect Month</h2>
         <p className="font-mono text-sm text-white/50 mb-1">{monthName} {year}</p>
         <p className="font-mono text-xs text-white/30 leading-relaxed mb-8 max-w-xs">
           You checked in every streak for the entire month. That's extraordinary discipline.
         </p>
-
         <div className="flex items-center gap-2 mb-8">
           {[0, 1, 2].map(i => (
             <Star key={i} size={18} style={{ color: "#c8f04c", fill: "#c8f04c" }} />
           ))}
         </div>
-
         <button
           onClick={onClose}
           className="px-6 py-2.5 rounded-xl font-mono text-xs tracking-widest transition-all hover:opacity-90 active:scale-95"
@@ -125,10 +188,7 @@ function LifeScoreRing({ score, isComplete }) {
         <circle cx="70" cy="70" r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
         <circle
           cx="70" cy="70" r={radius}
-          fill="none"
-          stroke={color}
-          strokeWidth="8"
-          strokeLinecap="round"
+          fill="none" stroke={color} strokeWidth="8" strokeLinecap="round"
           strokeDasharray={`${filled} ${circumference}`}
           style={{ transition: "stroke-dasharray 1s ease" }}
         />
@@ -164,18 +224,62 @@ function StreakStatRow({ streak, checkedInDays, daysElapsed }) {
       </div>
       <div className="flex items-center gap-3 shrink-0">
         <div className="w-20 h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
-          <div
-            className="h-full rounded-full transition-all duration-700"
-            style={{ width: `${consistency}%`, background: barColor }}
-          />
+          <div className="h-full rounded-full transition-all duration-700" style={{ width: `${consistency}%`, background: barColor }} />
         </div>
-        <span className="font-mono text-[11px] w-8 text-right" style={{ color: barColor }}>
-          {consistency}%
-        </span>
-        <span className="font-mono text-[10px] text-white/25 w-14 text-right">
-          {checkedInDays}/{daysElapsed}d
-        </span>
+        <span className="font-mono text-[11px] w-8 text-right" style={{ color: barColor }}>{consistency}%</span>
+        <span className="font-mono text-[10px] text-white/25 w-14 text-right">{checkedInDays}/{daysElapsed}d</span>
         {consistency === 100 && <CheckCircle2 size={12} style={{ color: "#c8f04c" }} />}
+      </div>
+    </div>
+  );
+}
+
+// ── Mission Row ───────────────────────────────────────────────────────────────
+
+function MissionStatRow({ mission }) {
+  const progress = Math.round(mission.progress ?? 0);
+  const color = getPriorityColor(mission.priority);
+  const days = daysUntil(mission.timeline);
+  const totalMilestones = mission.milestones?.length ?? 0;
+  const doneMilestones = mission.milestones?.filter((m) => m.completed).length ?? 0;
+  const isFinished = progress >= 100;
+
+  return (
+    <div className="flex items-center gap-4 py-3 border-b border-white/6 last:border-none">
+      <div className="w-0.5 self-stretch rounded-full shrink-0" style={{ background: color, minHeight: 20 }} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1.5">
+          <span className="font-mono text-xs text-white truncate">{mission.title}</span>
+          {isFinished && (
+            <span
+              className="font-mono text-[9px] tracking-widest px-1.5 py-0.5 rounded shrink-0"
+              style={{ color: "#c8f04c", background: "rgba(200,240,76,0.08)", border: "1px solid rgba(200,240,76,0.15)" }}
+            >
+              DONE
+            </span>
+          )}
+        </div>
+        <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+          <div className="h-full rounded-full transition-all duration-700" style={{ width: `${progress}%`, background: color }} />
+        </div>
+      </div>
+      <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-1 text-white/25">
+          <Target size={10} />
+          <span className="font-mono text-[10px]">{doneMilestones}/{totalMilestones}</span>
+        </div>
+        <div className="w-12 ml-5">
+          {days !== null && !isFinished && (
+            <div className="flex items-center gap-1" style={{ color: days <= 7 ? "#ef4444" : days <= 14 ? "#f97316" : "rgba(255,255,255,0.25)" }}>
+              <Clock size={10} />
+              <span className="font-mono text-[10px]">{days > 0 ? `${days}d` : "overdue"}</span>
+            </div>
+          )}
+        </div>
+        <span className="font-mono text-[11px] w-8 text-right" style={{ color }}>{progress}%</span>
+        <span className="font-mono text-[9px] tracking-widest w-12 text-right" style={{ color: `${color}80` }}>
+          {getPriorityLabel(mission.priority)}
+        </span>
       </div>
     </div>
   );
@@ -188,26 +292,24 @@ export default function Stats() {
   const [pageError, setPageError] = useState("");
   const [streaks, setStreaks] = useState([]);
   const [streakLogs, setStreakLogs] = useState({});
+  const [missions, setMissions] = useState([]);
   const [showAward, setShowAward] = useState(false);
   const [awardSeen, setAwardSeen] = useState(false);
 
   const { firstDay, today, daysElapsed, daysInMonth, monthName, year } = getMonthRange();
+  const dailyQuote = getDailyQuote();
 
   const load = useCallback(async () => {
     setLoading(true);
     setPageError("");
     try {
       const { data: streakData, error: streakErr } = await supabase
-        .from("streaks")
-        .select("*")
-        .order("created_at", { ascending: true });
+        .from("streaks").select("*").order("created_at", { ascending: true });
       if (streakErr) throw streakErr;
 
       const { data: logsData, error: logsErr } = await supabase
-        .from("streak_logs")
-        .select("streak_id, date")
-        .gte("date", firstDay)
-        .lte("date", today);
+        .from("streak_logs").select("streak_id, date")
+        .gte("date", firstDay).lte("date", today);
       if (logsErr) throw logsErr;
 
       const logsMap = {};
@@ -216,8 +318,15 @@ export default function Stats() {
         logsMap[log.streak_id].add(log.date);
       }
 
+      const { data: missionData, error: missionErr } = await supabase
+        .from("missions")
+        .select("id, title, priority, progress, timeline, created_at, milestones(id, completed)")
+        .order("priority", { ascending: true });
+      if (missionErr) throw missionErr;
+
       setStreaks(streakData || []);
       setStreakLogs(logsMap);
+      setMissions(missionData || []);
     } catch (e) {
       setPageError(e.message);
     } finally {
@@ -239,6 +348,8 @@ export default function Stats() {
   const isComplete = lifeScore === 100;
   const monthProgress = Math.round((daysElapsed / daysInMonth) * 100);
   const perfectCount = streaks.filter((_, i) => Math.round(streakConsistencies[i] * 100) === 100).length;
+  const inProgress = missions.filter((m) => (m.progress ?? 0) < 100);
+  const finished = missions.filter((m) => (m.progress ?? 0) >= 100);
 
   useEffect(() => {
     if (isComplete && !awardSeen && !loading && streaks.length > 0) {
@@ -285,13 +396,28 @@ export default function Stats() {
           </div>
         )}
 
+        {/* ── Daily Quote ── */}
+        <div
+          className="rounded-2xl border mb-4 px-6 py-5"
+          style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)", borderLeft: "2px solid rgba(200,240,76,0.25)" }}
+        >
+          <p
+            className="font-mono text-sm leading-relaxed mb-3"
+            style={{ color: "rgba(255,255,255,0.40)", fontStyle: "italic" }}
+          >
+            "{dailyQuote.text}"
+          </p>
+          <p className="font-mono text-[10px] tracking-widest" style={{ color: "rgba(255,255,255,0.30)" }}>
+            — {dailyQuote.author}
+          </p>
+        </div>
+
         {/* ── Life Score Card ── */}
         <div
           className="rounded-2xl border mb-4 overflow-hidden"
           style={{ background: "#111", borderColor: isComplete ? "rgba(200,240,76,0.25)" : "rgba(255,255,255,0.08)" }}
         >
           {isComplete && <div className="h-0.5 w-full" style={{ background: "#c8f04c" }} />}
-
           <div className="px-6 py-6">
             <div className="flex items-center justify-between mb-6">
               <div>
@@ -311,9 +437,7 @@ export default function Stats() {
 
             <div className="flex items-center gap-8">
               <LifeScoreRing score={lifeScore} isComplete={isComplete} />
-
               <div className="flex-1 space-y-4">
-                {/* Month progress */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="font-mono text-[10px] tracking-widest text-white/30 uppercase">Month Progress</span>
@@ -323,8 +447,6 @@ export default function Stats() {
                     <div className="h-full rounded-full" style={{ width: `${monthProgress}%`, background: "rgba(255,255,255,0.2)" }} />
                   </div>
                 </div>
-
-                {/* Quick stats */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
                     <p className="font-mono text-[9px] tracking-widest text-white/25 uppercase mb-1">Streaks</p>
@@ -335,7 +457,6 @@ export default function Stats() {
                     <p className="font-mono text-xl" style={{ color: "#c8f04c" }}>{perfectCount}</p>
                   </div>
                 </div>
-
                 {!isComplete && streaks.length > 0 && (
                   <p className="font-mono text-[10px] text-white/20 leading-relaxed">
                     Check in all streaks daily to reach 100% and earn the Honor Award.
@@ -346,7 +467,7 @@ export default function Stats() {
           </div>
         </div>
 
-        {/* ── Streak Consistency — collapsible ── */}
+        {/* ── Streak Consistency ── */}
         {streaks.length > 0 && (
           <CollapsibleSection title="Streak Consistency" subtitle="This month">
             <div className="px-5">
@@ -362,7 +483,7 @@ export default function Stats() {
           </CollapsibleSection>
         )}
 
-        {/* ── Shield Status — collapsible ── */}
+        {/* ── Shield Status ── */}
         {streaks.length > 0 && (
           <CollapsibleSection title="Shield Status">
             <div className="px-5 py-4 grid grid-cols-2 gap-3">
@@ -376,8 +497,7 @@ export default function Stats() {
                   <div className="flex items-center gap-0.5 shrink-0">
                     {Array.from({ length: 3 }).map((_, i) => (
                       <Shield
-                        key={i}
-                        size={11}
+                        key={i} size={11}
                         style={{
                           color: i < (streak.shields ?? 0) ? "#60a5fa" : "rgba(255,255,255,0.12)",
                           fill: i < (streak.shields ?? 0) ? "rgba(96,165,250,0.2)" : "none",
@@ -391,14 +511,41 @@ export default function Stats() {
           </CollapsibleSection>
         )}
 
+        {/* ── Mission Progress ── */}
+        {missions.length > 0 && (
+          <CollapsibleSection title="Mission Progress" subtitle={`${inProgress.length} in progress · ${finished.length} done`}>
+            <div className="px-5">
+              {inProgress.map((mission) => (
+                <MissionStatRow key={mission.id} mission={mission} />
+              ))}
+              {finished.length > 0 && (
+                <>
+                  {inProgress.length > 0 && (
+                    <div className="flex items-center gap-3 py-2">
+                      <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+                      <span className="font-mono text-[9px] tracking-widest text-white/15 uppercase">Completed</span>
+                      <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+                    </div>
+                  )}
+                  {finished.map((mission) => (
+                    <div key={mission.id} style={{ opacity: 0.45 }}>
+                      <MissionStatRow mission={mission} />
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </CollapsibleSection>
+        )}
+
         {/* Empty state */}
-        {streaks.length === 0 && (
+        {streaks.length === 0 && missions.length === 0 && (
           <div className="text-center py-24">
             <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5 border border-white/8" style={{ background: "#111" }}>
               <BarChart2 size={22} className="text-white/20" />
             </div>
             <p className="font-mono text-white/15 text-[10px] tracking-widest uppercase mb-3">No data yet</p>
-            <p className="font-mono text-white/30 text-sm">Create streaks and start checking in to see your life score.</p>
+            <p className="font-mono text-white/30 text-sm">Create streaks and missions to see your stats.</p>
           </div>
         )}
 
