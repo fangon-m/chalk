@@ -5,8 +5,8 @@ import {
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
   List, ListOrdered, Quote, Minus, Code, Heading1, Heading2,
   Cloud, CloudOff, CloudUpload, Undo, Redo,
-  Folder, FolderOpen, FolderPlus, ChevronDown, ChevronRight,
-  Move,
+  Folder, FolderPlus, ChevronDown, ChevronRight,
+  Move, RotateCcw, Trash,
 } from "lucide-react";
 import { useEditor, EditorContent, Mark, mergeAttributes } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -15,39 +15,25 @@ import Typography from "@tiptap/extension-typography";
 import TextAlign from "@tiptap/extension-text-align";
 import Underline from "@tiptap/extension-underline";
 import { supabase } from "../lib/supabase";
-import { getJournals, createJournal, updateJournal, deleteJournal } from "../lib/journals";
+import { createJournal, updateJournal } from "../lib/journals";
 
 // ── Custom marks ──────────────────────────────────────────────────────────────
 
 const FontFamilyMark = Mark.create({
   name: "fontFamily",
-  addAttributes() {
-    return { fontFamily: { default: null, parseHTML: (el) => el.style.fontFamily || null, renderHTML: (attrs) => attrs.fontFamily ? { style: `font-family: ${attrs.fontFamily}` } : {} } };
-  },
+  addAttributes() { return { fontFamily: { default: null, parseHTML: (el) => el.style.fontFamily || null, renderHTML: (attrs) => attrs.fontFamily ? { style: `font-family: ${attrs.fontFamily}` } : {} } }; },
   parseHTML() { return [{ tag: "span", getAttrs: (el) => el.style.fontFamily ? { fontFamily: el.style.fontFamily } : false }]; },
   renderHTML({ HTMLAttributes }) { return ["span", mergeAttributes(HTMLAttributes), 0]; },
-  addCommands() {
-    return {
-      setFontFamily: (fontFamily) => ({ commands }) => commands.setMark(this.name, { fontFamily }),
-      unsetFontFamily: () => ({ commands }) => commands.unsetMark(this.name),
-    };
-  },
+  addCommands() { return { setFontFamily: (v) => ({ commands }) => commands.setMark(this.name, { fontFamily: v }), unsetFontFamily: () => ({ commands }) => commands.unsetMark(this.name) }; },
 });
 
 const FontSizeMark = Mark.create({
   name: "fontSize",
   inclusive: true,
-  addAttributes() {
-    return { fontSize: { default: null, parseHTML: (el) => el.style.fontSize || null, renderHTML: (attrs) => attrs.fontSize ? { style: `font-size: ${attrs.fontSize}` } : {} } };
-  },
+  addAttributes() { return { fontSize: { default: null, parseHTML: (el) => el.style.fontSize || null, renderHTML: (attrs) => attrs.fontSize ? { style: `font-size: ${attrs.fontSize}` } : {} } }; },
   parseHTML() { return [{ tag: "span", getAttrs: (el) => el.style.fontSize ? { fontSize: el.style.fontSize } : false }]; },
   renderHTML({ HTMLAttributes }) { return ["span", mergeAttributes(HTMLAttributes), 0]; },
-  addCommands() {
-    return {
-      setFontSize: (fontSize) => ({ commands }) => commands.setMark(this.name, { fontSize }),
-      unsetFontSize: () => ({ commands }) => commands.unsetMark(this.name),
-    };
-  },
+  addCommands() { return { setFontSize: (v) => ({ commands }) => commands.setMark(this.name, { fontSize: v }), unsetFontSize: () => ({ commands }) => commands.unsetMark(this.name) }; },
 });
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -66,28 +52,16 @@ const FONTS = [
   { label: "Sans",    value: "'Helvetica Neue', Arial, sans-serif" },
   { label: "Courier", value: "'Courier New', monospace" },
 ];
-
 const FONT_SIZES = ["12px", "14px", "16px", "18px", "22px", "28px"];
-
 const THEMES = [
-  { label: "Dark",     bg: "#0d0d0d" },
-  { label: "Dim",      bg: "#181818" },
-  { label: "Gray",     bg: "#2a2a2a" },
-  { label: "Charcoal", bg: "#1a1a1a" },
-  { label: "White",    bg: "#f5f5f0" },
-  { label: "Beige",    bg: "#e8dcc8" },
-  { label: "Stone",    bg: "#d9d9d9" },
-  { label: "Ash",      bg: "#e0e0e0" },
+  { label: "Dark",     bg: "#0d0d0d" }, { label: "Dim",      bg: "#181818" },
+  { label: "Gray",     bg: "#2a2a2a" }, { label: "Charcoal", bg: "#1a1a1a" },
+  { label: "White",    bg: "#f5f5f0" }, { label: "Beige",    bg: "#e8dcc8" },
+  { label: "Stone",    bg: "#d9d9d9" }, { label: "Ash",      bg: "#e0e0e0" },
 ];
-
 const ZOOM_LEVELS = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
-
-const FOLDER_COLORS = [
-  "#c8f04c", "#60a5fa", "#f97316", "#ef4444",
-  "#a78bfa", "#34d399", "#f472b6", "#fbbf24",
-];
-
-const FOLDER_ICONS = ["folder", "book", "star", "heart", "lock", "sun", "moon", "zap"];
+const FOLDER_COLORS = ["#c8f04c","#60a5fa","#f97316","#ef4444","#a78bfa","#34d399","#f472b6","#fbbf24"];
+const FOLDER_ICONS  = ["folder","book","star","heart","lock","sun","moon","zap"];
 
 const DEFAULT_TYPO = { font: "'DM Mono', monospace", size: "15px", theme: THEMES[0], zoom: 1.0 };
 const AUTOSAVE_DELAY = 2000;
@@ -102,46 +76,80 @@ function excerpt(content, len = 120) {
   return plain.length > len ? plain.slice(0, len) + "…" : plain;
 }
 
-// ── Folder lib ────────────────────────────────────────────────────────────────
+// ── Data helpers ──────────────────────────────────────────────────────────────
+
+async function getJournals() {
+  const { data, error } = await supabase.from("journals").select("*").is("deleted_at", null).order("updated_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+async function getDeletedJournals() {
+  const { data, error } = await supabase.from("journals").select("*").not("deleted_at", "is", null).order("deleted_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+async function softDeleteJournal(id) {
+  const { error } = await supabase.from("journals").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+  if (error) throw error;
+}
+
+async function restoreJournal(id) {
+  const { error } = await supabase.from("journals").update({ deleted_at: null }).eq("id", id);
+  if (error) throw error;
+}
+
+async function permanentDeleteJournal(id) {
+  const { error } = await supabase.from("journals").delete().eq("id", id);
+  if (error) throw error;
+}
 
 async function getFolders() {
-  const { data, error } = await supabase
-    .from("journal_folders")
-    .select("*")
-    .order("order_index", { ascending: true });
+  const { data, error } = await supabase.from("journal_folders").select("*").is("deleted_at", null).order("order_index", { ascending: true });
+  if (error) throw error;
+  return data;
+}
+
+async function getDeletedFolders() {
+  const { data, error } = await supabase.from("journal_folders").select("*").not("deleted_at", "is", null).order("deleted_at", { ascending: false });
   if (error) throw error;
   return data;
 }
 
 async function createFolder(form) {
   const { data: { user } } = await supabase.auth.getUser();
-  const { data, error } = await supabase
-    .from("journal_folders")
-    .insert({ user_id: user.id, name: form.name, color: form.color, icon: form.icon })
-    .select().single();
+  const { data, error } = await supabase.from("journal_folders").insert({ user_id: user.id, ...form }).select().single();
   if (error) throw error;
   return data;
 }
 
 async function updateFolder(id, form) {
-  const { data, error } = await supabase
-    .from("journal_folders")
-    .update({ name: form.name, color: form.color, icon: form.icon })
-    .eq("id", id).select().single();
+  const { data, error } = await supabase.from("journal_folders").update(form).eq("id", id).select().single();
   if (error) throw error;
   return data;
 }
 
-async function deleteFolder(id) {
+async function softDeleteFolder(id) {
+  // Soft-delete the folder — journals keep their folder_id so they restore with it
+  const { error } = await supabase.from("journal_folders").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+  if (error) throw error;
+}
+
+async function restoreFolder(id) {
+  const { error } = await supabase.from("journal_folders").update({ deleted_at: null }).eq("id", id);
+  if (error) throw error;
+}
+
+async function permanentDeleteFolder(id) {
+  // Orphan journals first so they don't disappear, then hard delete
+  await supabase.from("journals").update({ folder_id: null }).eq("folder_id", id);
   const { error } = await supabase.from("journal_folders").delete().eq("id", id);
   if (error) throw error;
 }
 
 async function moveJournalToFolder(journalId, folderId) {
-  const { error } = await supabase
-    .from("journals")
-    .update({ folder_id: folderId })
-    .eq("id", journalId);
+  const { error } = await supabase.from("journals").update({ folder_id: folderId }).eq("id", journalId);
   if (error) throw error;
 }
 
@@ -150,15 +158,28 @@ async function moveJournalToFolder(journalId, folderId) {
 function FolderIcon({ icon, size = 14, color }) {
   const props = { size, style: { color } };
   switch (icon) {
-    case "book":   return <BookOpen {...props} />;
-    case "star":   return <span style={{ fontSize: size, color }}>★</span>;
-    case "heart":  return <span style={{ fontSize: size, color }}>♥</span>;
-    case "lock":   return <span style={{ fontSize: size, color }}>🔒</span>;
-    case "sun":    return <span style={{ fontSize: size, color }}>☀</span>;
-    case "moon":   return <span style={{ fontSize: size, color }}>☽</span>;
-    case "zap":    return <span style={{ fontSize: size, color }}>⚡</span>;
-    default:       return <Folder {...props} />;
+    case "book":  return <BookOpen {...props} />;
+    case "star":  return <span style={{ fontSize: size, color }}>★</span>;
+    case "heart": return <span style={{ fontSize: size, color }}>♥</span>;
+    case "lock":  return <span style={{ fontSize: size, color }}>🔒</span>;
+    case "sun":   return <span style={{ fontSize: size, color }}>☀</span>;
+    case "moon":  return <span style={{ fontSize: size, color }}>☽</span>;
+    case "zap":   return <span style={{ fontSize: size, color }}>⚡</span>;
+    default:      return <Folder {...props} />;
   }
+}
+
+// ── Section label (matches UNCATEGORIZED style) ───────────────────────────────
+
+function SectionLabel({ icon, label, count, color, action }) {
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 mb-3">
+      {icon}
+      <span className="font-mono text-[10px] tracking-widest uppercase" style={{ color: color || "rgba(255,255,255,0.2)" }}>{label}</span>
+      {count !== undefined && <span className="font-mono text-[10px]" style={{ color: color ? `${color}60` : "rgba(255,255,255,0.15)" }}>{count}</span>}
+      {action && <div className="ml-auto">{action}</div>}
+    </div>
+  );
 }
 
 // ── Save Indicator ────────────────────────────────────────────────────────────
@@ -185,47 +206,36 @@ function SaveIndicator({ status, isLightTheme }) {
 
 function ToolBtn({ onClick, active, title, children, isLightTheme }) {
   return (
-    <button
-      onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); }}
-      title={title}
+    <button onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); }} title={title}
       className="flex items-center justify-center rounded-md transition-all"
-      style={{
-        width: 28, height: 28, flexShrink: 0, cursor: "pointer",
+      style={{ width: 28, height: 28, flexShrink: 0, cursor: "pointer",
         background: active ? isLightTheme ? "rgba(212,165,116,0.15)" : "rgba(200,240,76,0.15)" : "transparent",
         color: active ? isLightTheme ? "#8b5a3c" : "#c8f04c" : isLightTheme ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.45)",
         border: active ? isLightTheme ? "1px solid rgba(212,165,116,0.25)" : "1px solid rgba(200,240,76,0.25)" : "1px solid transparent",
-      }}
-    >
-      {children}
-    </button>
+      }}>{children}</button>
   );
 }
-
-function ToolDivider({ isLightTheme }) {
-  return <div style={{ width: 1, height: 18, background: isLightTheme ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.08)", margin: "0 2px", flexShrink: 0 }} />;
-}
+function ToolDivider({ isLightTheme }) { return <div style={{ width: 1, height: 18, background: isLightTheme ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.08)", margin: "0 2px", flexShrink: 0 }} />; }
 
 function FontSelect({ typoFont, onTypoChange, editor, isLightTheme }) {
-  const activeFont = editor?.getAttributes("fontFamily")?.fontFamily || typoFont;
+  const active = editor?.getAttributes("fontFamily")?.fontFamily || typoFont;
   return (
-    <select value={activeFont} onMouseDown={(e) => e.stopPropagation()}
+    <select value={active} onMouseDown={(e) => e.stopPropagation()}
       onChange={(e) => { onTypoChange(e.target.value); editor?.chain().focus().setFontFamily(e.target.value).run(); }}
       className="font-mono text-[11px] rounded-md px-1 focus:outline-none cursor-pointer"
-      style={{ background: isLightTheme ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)", border: isLightTheme ? "1px solid rgba(0,0,0,0.1)" : "1px solid rgba(255,255,255,0.1)", color: isLightTheme ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.5)", height: 28, maxWidth: 80 }}
-    >
+      style={{ background: isLightTheme ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)", border: isLightTheme ? "1px solid rgba(0,0,0,0.1)" : "1px solid rgba(255,255,255,0.1)", color: isLightTheme ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.5)", height: 28, maxWidth: 80 }}>
       {FONTS.map((f) => <option key={f.value} value={f.value} style={{ background: "#111" }}>{f.label}</option>)}
     </select>
   );
 }
 
 function FontSizeSelect({ typoSize, editor, isLightTheme }) {
-  const activeSize = editor?.getAttributes("fontSize")?.fontSize || typoSize;
+  const active = editor?.getAttributes("fontSize")?.fontSize || typoSize;
   return (
-    <select value={activeSize} onMouseDown={(e) => e.stopPropagation()}
+    <select value={active} onMouseDown={(e) => e.stopPropagation()}
       onChange={(e) => { editor?.chain().focus().setFontSize(e.target.value).run(); }}
       className="font-mono text-[11px] rounded-md px-1 focus:outline-none cursor-pointer"
-      style={{ background: isLightTheme ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)", border: isLightTheme ? "1px solid rgba(0,0,0,0.1)" : "1px solid rgba(255,255,255,0.1)", color: isLightTheme ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.5)", height: 28 }}
-    >
+      style={{ background: isLightTheme ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)", border: isLightTheme ? "1px solid rgba(0,0,0,0.1)" : "1px solid rgba(255,255,255,0.1)", color: isLightTheme ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.5)", height: 28 }}>
       {FONT_SIZES.map((s) => <option key={s} value={s} style={{ background: "#111" }}>{s}</option>)}
     </select>
   );
@@ -235,15 +245,9 @@ function ZoomControl({ zoom, onZoomChange, isLightTheme }) {
   const idx = ZOOM_LEVELS.indexOf(zoom);
   return (
     <div className="flex items-center gap-0.5">
-      <ToolBtn onClick={() => idx > 0 && onZoomChange(ZOOM_LEVELS[idx - 1])} active={false} title="Zoom out" isLightTheme={isLightTheme}>
-        <span style={{ fontSize: 15, fontWeight: 400, lineHeight: 1, marginTop: -1 }}>−</span>
-      </ToolBtn>
-      <span className="font-mono text-[10px] tracking-widest text-center select-none" style={{ width: 36, color: isLightTheme ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.4)" }}>
-        {Math.round(zoom * 100)}%
-      </span>
-      <ToolBtn onClick={() => idx < ZOOM_LEVELS.length - 1 && onZoomChange(ZOOM_LEVELS[idx + 1])} active={false} title="Zoom in" isLightTheme={isLightTheme}>
-        <span style={{ fontSize: 15, fontWeight: 400, lineHeight: 1, marginTop: -1 }}>+</span>
-      </ToolBtn>
+      <ToolBtn onClick={() => idx > 0 && onZoomChange(ZOOM_LEVELS[idx - 1])} active={false} title="Zoom out" isLightTheme={isLightTheme}><span style={{ fontSize: 15, fontWeight: 400, lineHeight: 1, marginTop: -1 }}>−</span></ToolBtn>
+      <span className="font-mono text-[10px] tracking-widest text-center select-none" style={{ width: 36, color: isLightTheme ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.4)" }}>{Math.round(zoom * 100)}%</span>
+      <ToolBtn onClick={() => idx < ZOOM_LEVELS.length - 1 && onZoomChange(ZOOM_LEVELS[idx + 1])} active={false} title="Zoom in" isLightTheme={isLightTheme}><span style={{ fontSize: 15, fontWeight: 400, lineHeight: 1, marginTop: -1 }}>+</span></ToolBtn>
     </div>
   );
 }
@@ -252,8 +256,7 @@ function FormattingBar({ editor, typo, onTypoChange, bgColor, isLightTheme }) {
   if (!editor) return null;
   return (
     <div className="sticky z-10 flex items-center gap-1 px-4 py-2 flex-wrap"
-      style={{ top: 57, background: bgColor, borderBottom: isLightTheme ? "1px solid rgba(0,0,0,0.1)" : "1px solid rgba(255,255,255,0.06)" }}
-    >
+      style={{ top: 57, background: bgColor, borderBottom: isLightTheme ? "1px solid rgba(0,0,0,0.1)" : "1px solid rgba(255,255,255,0.06)" }}>
       <ToolBtn onClick={() => editor.chain().focus().undo().run()} active={false} title="Undo" isLightTheme={isLightTheme}><Undo size={13} /></ToolBtn>
       <ToolBtn onClick={() => editor.chain().focus().redo().run()} active={false} title="Redo" isLightTheme={isLightTheme}><Redo size={13} /></ToolBtn>
       <ToolDivider isLightTheme={isLightTheme} />
@@ -270,7 +273,7 @@ function FormattingBar({ editor, typo, onTypoChange, bgColor, isLightTheme }) {
       <ToolDivider isLightTheme={isLightTheme} />
       <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive("bulletList")} title="Bullet" isLightTheme={isLightTheme}><List size={13} /></ToolBtn>
       <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive("orderedList")} title="Numbered" isLightTheme={isLightTheme}><ListOrdered size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive("blockquote")} title="Blockquote" isLightTheme={isLightTheme}><Quote size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive("blockquote")} title="Quote" isLightTheme={isLightTheme}><Quote size={13} /></ToolBtn>
       <ToolDivider isLightTheme={isLightTheme} />
       <ToolBtn onClick={() => editor.chain().focus().setTextAlign("left").run()} active={editor.isActive({ textAlign: "left" })} title="Left" isLightTheme={isLightTheme}><AlignLeft size={13} /></ToolBtn>
       <ToolBtn onClick={() => editor.chain().focus().setTextAlign("center").run()} active={editor.isActive({ textAlign: "center" })} title="Center" isLightTheme={isLightTheme}><AlignCenter size={13} /></ToolBtn>
@@ -282,8 +285,7 @@ function FormattingBar({ editor, typo, onTypoChange, bgColor, isLightTheme }) {
       <div className="flex items-center gap-1 ml-1">
         {THEMES.map((t) => (
           <button key={t.label} onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onTypoChange({ ...typo, theme: t }); }} title={t.label} className="rounded-md transition-all"
-            style={{ width: 18, height: 18, background: t.bg, border: typo.theme.label === t.label ? isLightTheme ? "1.5px solid #8b5a3c" : "1.5px solid #c8f04c" : isLightTheme ? "1.5px solid rgba(0,0,0,0.25)" : "1.5px solid rgba(255,255,255,0.15)" }}
-          />
+            style={{ width: 18, height: 18, background: t.bg, border: typo.theme.label === t.label ? isLightTheme ? "1.5px solid #8b5a3c" : "1.5px solid #c8f04c" : isLightTheme ? "1.5px solid rgba(0,0,0,0.25)" : "1.5px solid rgba(255,255,255,0.15)" }} />
         ))}
       </div>
       <ToolDivider isLightTheme={isLightTheme} />
@@ -294,14 +296,14 @@ function FormattingBar({ editor, typo, onTypoChange, bgColor, isLightTheme }) {
 
 // ── Confirm Modal ─────────────────────────────────────────────────────────────
 
-function ConfirmModal({ message, onConfirm, onCancel }) {
+function ConfirmModal({ message, onConfirm, onCancel, confirmLabel = "DELETE", confirmColor = "#ef4444" }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }} onClick={(e) => e.stopPropagation()}>
       <div className="rounded-2xl border border-white/10 p-6 w-80" style={{ background: "#111" }}>
         <p className="font-mono text-sm text-white/70 mb-6">{message}</p>
         <div className="flex justify-end gap-3">
           <button onClick={onCancel} className="px-4 py-2 rounded-lg border border-white/10 text-white/40 font-mono text-xs tracking-widest hover:text-white/60 transition-colors cursor-pointer">CANCEL</button>
-          <button onClick={onConfirm} className="px-4 py-2 rounded-lg font-mono text-xs tracking-widest cursor-pointer" style={{ background: "#ef4444", color: "white" }}>DELETE</button>
+          <button onClick={onConfirm} className="px-4 py-2 rounded-lg font-mono text-xs tracking-widest cursor-pointer" style={{ background: confirmColor, color: "white" }}>{confirmLabel}</button>
         </div>
       </div>
     </div>
@@ -319,26 +321,14 @@ function MoveToFolderModal({ journal, folders, onMove, onCancel }) {
           <button onClick={onCancel} className="text-white/30 hover:text-white/60 transition-colors cursor-pointer"><X size={14} /></button>
         </div>
         <div className="py-2 max-h-64 overflow-y-auto">
-          {/* No folder option */}
-          <button
-            onClick={() => onMove(null)}
-            className="w-full flex items-center gap-3 px-5 py-3 hover:bg-white/5 transition-colors text-left cursor-pointer"
-          >
-            <div className="w-6 h-6 rounded flex items-center justify-center" style={{ background: "rgba(255,255,255,0.06)" }}>
-              <BookOpen size={12} className="text-white/40" />
-            </div>
+          <button onClick={() => onMove(null)} className="w-full flex items-center gap-3 px-5 py-3 hover:bg-white/5 transition-colors text-left cursor-pointer">
+            <div className="w-6 h-6 rounded flex items-center justify-center" style={{ background: "rgba(255,255,255,0.06)" }}><BookOpen size={12} className="text-white/40" /></div>
             <span className="font-mono text-xs text-white/50">Uncategorized</span>
             {journal.folder_id === null && <span className="ml-auto font-mono text-[9px] text-white/25">current</span>}
           </button>
           {folders.map((folder) => (
-            <button
-              key={folder.id}
-              onClick={() => onMove(folder.id)}
-              className="w-full flex items-center gap-3 px-5 py-3 hover:bg-white/5 transition-colors text-left cursor-pointer"
-            >
-              <div className="w-6 h-6 rounded flex items-center justify-center" style={{ background: `${folder.color}15` }}>
-                <FolderIcon icon={folder.icon} size={12} color={folder.color} />
-              </div>
+            <button key={folder.id} onClick={() => onMove(folder.id)} className="w-full flex items-center gap-3 px-5 py-3 hover:bg-white/5 transition-colors text-left cursor-pointer">
+              <div className="w-6 h-6 rounded flex items-center justify-center" style={{ background: `${folder.color}15` }}><FolderIcon icon={folder.icon} size={12} color={folder.color} /></div>
               <span className="font-mono text-xs text-white/70">{folder.name}</span>
               {journal.folder_id === folder.id && <span className="ml-auto font-mono text-[9px] text-white/25">current</span>}
             </button>
@@ -365,11 +355,7 @@ function FolderModal({ folder, onClose, onSave }) {
       if (isEdit) await updateFolder(folder.id, form);
       else await createFolder(form);
       onSave();
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setSaving(false);
-    }
+    } catch (e) { setError(e.message); } finally { setSaving(false); }
   }
 
   return (
@@ -380,49 +366,32 @@ function FolderModal({ folder, onClose, onSave }) {
           <button onClick={onClose} className="text-white/30 hover:text-white/70 transition-colors cursor-pointer"><X size={16} /></button>
         </div>
         <div className="px-6 py-5 space-y-5">
-          {/* Name */}
           <div>
             <label className="block font-mono text-[10px] tracking-widest text-white/40 uppercase mb-1.5">Folder Name</label>
-            <input
-              value={form.name}
-              onChange={(e) => { setForm({ ...form, name: e.target.value }); setError(""); }}
-              placeholder="My folder..."
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors"
-            />
+            <input value={form.name} onChange={(e) => { setForm({ ...form, name: e.target.value }); setError(""); }} placeholder="My folder..."
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors" />
             {error && <p className="font-mono text-[10px] text-red-400 mt-1">{error}</p>}
           </div>
-
-          {/* Color */}
           <div>
             <label className="block font-mono text-[10px] tracking-widest text-white/40 uppercase mb-2">Color</label>
             <div className="flex gap-2 flex-wrap">
               {FOLDER_COLORS.map((c) => (
-                <button
-                  key={c} onClick={() => setForm({ ...form, color: c })}
-                  className="w-7 h-7 rounded-lg transition-all cursor-pointer"
-                  style={{ background: c, outline: form.color === c ? `2px solid ${c}` : "none", outlineOffset: 2, opacity: form.color === c ? 1 : 0.5 }}
-                />
+                <button key={c} onClick={() => setForm({ ...form, color: c })} className="w-7 h-7 rounded-lg transition-all cursor-pointer"
+                  style={{ background: c, outline: form.color === c ? `2px solid ${c}` : "none", outlineOffset: 2, opacity: form.color === c ? 1 : 0.5 }} />
               ))}
             </div>
           </div>
-
-          {/* Icon */}
           <div>
             <label className="block font-mono text-[10px] tracking-widest text-white/40 uppercase mb-2">Icon</label>
             <div className="flex gap-2 flex-wrap">
               {FOLDER_ICONS.map((ic) => (
-                <button
-                  key={ic} onClick={() => setForm({ ...form, icon: ic })}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer"
-                  style={{ background: form.icon === ic ? `${form.color}20` : "rgba(255,255,255,0.05)", border: form.icon === ic ? `1px solid ${form.color}50` : "1px solid rgba(255,255,255,0.08)" }}
-                >
+                <button key={ic} onClick={() => setForm({ ...form, icon: ic })} className="w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer"
+                  style={{ background: form.icon === ic ? `${form.color}20` : "rgba(255,255,255,0.05)", border: form.icon === ic ? `1px solid ${form.color}50` : "1px solid rgba(255,255,255,0.08)" }}>
                   <FolderIcon icon={ic} size={14} color={form.icon === ic ? form.color : "rgba(255,255,255,0.4)"} />
                 </button>
               ))}
             </div>
           </div>
-
-          {/* Preview */}
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
             <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: `${form.color}20` }}>
               <FolderIcon icon={form.icon} size={14} color={form.color} />
@@ -430,15 +399,10 @@ function FolderModal({ folder, onClose, onSave }) {
             <span className="font-mono text-sm" style={{ color: form.color }}>{form.name || "Folder name"}</span>
           </div>
         </div>
-
         <div className="px-6 py-4 border-t border-white/8 flex justify-end gap-3">
           <button onClick={onClose} className="px-4 py-2 rounded-lg border border-white/10 text-white/40 font-mono text-xs tracking-widest hover:text-white/60 transition-colors cursor-pointer">CANCEL</button>
-          <button
-            onClick={handleSubmit}
-            disabled={saving || !form.name.trim()}
-            className="px-5 py-2 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-30 flex items-center gap-2 cursor-pointer"
-            style={{ background: form.name.trim() ? "#c8f04c" : "#444", color: "#0d0d0d" }}
-          >
+          <button onClick={handleSubmit} disabled={saving || !form.name.trim()} className="px-5 py-2 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-30 flex items-center gap-2 cursor-pointer"
+            style={{ background: form.name.trim() ? "#c8f04c" : "#444", color: "#0d0d0d" }}>
             {saving && <Loader2 size={12} className="animate-spin" />}
             {isEdit ? "SAVE" : "CREATE"}
           </button>
@@ -456,19 +420,16 @@ function JournalEditor({ journal, onClose }) {
   const [saveStatus, setSaveStatus] = useState("idle");
   const [typo, setTypo] = useState(DEFAULT_TYPO);
   const [, forceUpdate] = useState(0);
-
-  const journalIdRef    = useRef(journal?.id || null);
+  const journalIdRef = useRef(journal?.id || null);
   const autosaveTimerRef = useRef(null);
-  const savedTimerRef    = useRef(null);
-  const editorReadyRef   = useRef(false);
-  const titleMountedRef  = useRef(false);
+  const savedTimerRef = useRef(null);
+  const editorReadyRef = useRef(false);
+  const titleMountedRef = useRef(false);
 
   const editor = useEditor({
-    extensions: [
-      StarterKit, Underline, Typography, FontFamilyMark, FontSizeMark,
+    extensions: [StarterKit, Underline, Typography, FontFamilyMark, FontSizeMark,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
-      Placeholder.configure({ placeholder: ({ node }) => node.type.name === "heading" ? "Heading…" : "Start writing…" }),
-    ],
+      Placeholder.configure({ placeholder: ({ node }) => node.type.name === "heading" ? "Heading…" : "Start writing…" })],
     content: journal?.content || "",
     editorProps: { attributes: { class: "chalk-editor focus:outline-none" } },
     onCreate: () => { setTimeout(() => { editorReadyRef.current = true; }, 50); },
@@ -553,29 +514,22 @@ function JournalEditor({ journal, onClose }) {
         .chalk-editor .is-editor-empty:first-child::before, .chalk-editor .is-empty::before { content: attr(data-placeholder); color: ${placeholderColor}; pointer-events: none; float: left; height: 0; }
         .chalk-editor ::selection { background: ${isLightTheme ? "rgba(212,165,116,0.2)" : "rgba(200,240,76,0.2)"}; }
       `}</style>
-
       <div className="flex items-center px-6 py-4 border-b sticky top-0 z-20 transition-colors duration-300"
-        style={{ background: typo.theme.bg, borderColor: isLightTheme ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.06)", height: 57, gap: 16 }}
-      >
+        style={{ background: typo.theme.bg, borderColor: isLightTheme ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.06)", height: 57, gap: 16 }}>
         <button onClick={handleBack} className="flex items-center gap-2 font-mono text-xs tracking-widest transition-colors shrink-0"
           style={{ color: isLightTheme ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.35)" }}
           onMouseEnter={e => e.currentTarget.style.color = isLightTheme ? "rgba(0,0,0,0.7)" : "rgba(255,255,255,0.7)"}
-          onMouseLeave={e => e.currentTarget.style.color = isLightTheme ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.35)"}
-        >
+          onMouseLeave={e => e.currentTarget.style.color = isLightTheme ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.35)"}>
           <ArrowLeft size={14} /> JOURNALS
         </button>
         <div style={{ flex: 1 }} />
         <SaveIndicator status={saveStatus} isLightTheme={isLightTheme} />
       </div>
-
       <FormattingBar editor={editor} typo={typo} onTypoChange={setTypo} bgColor={typo.theme.bg} isLightTheme={isLightTheme} />
-
       <div className="max-w-2xl mx-auto w-full px-6 py-10"
-        style={{ transform: `scale(${typo.zoom})`, transformOrigin: "top center", marginBottom: zoomCompensation }}
-      >
+        style={{ transform: `scale(${typo.zoom})`, transformOrigin: "top center", marginBottom: zoomCompensation }}>
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Entry title (optional)"
-          className="chalk-title w-full bg-transparent focus:outline-none mb-6 border-none" style={{ caretColor }}
-        />
+          className="chalk-title w-full bg-transparent focus:outline-none mb-6 border-none" style={{ caretColor }} />
         <div className="flex items-center gap-3 mb-8">
           <div className="flex-1 h-px" style={{ background: isLightTheme ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.06)" }} />
           <span className="font-mono text-[10px] tracking-widest uppercase" style={{ color: isLightTheme ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.2)" }}>
@@ -591,7 +545,7 @@ function JournalEditor({ journal, onClose }) {
 
 // ── Journal Card ──────────────────────────────────────────────────────────────
 
-function JournalCard({ journal, folders, onEdit, onDelete, onMove, isDragOver, onDragStart, onDragEnd }) {
+function JournalCard({ journal, folders, onEdit, onSoftDelete, onMove, onDragStart, onDragEnd }) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [showMove, setShowMove] = useState(false);
   const hasTitle = journal.title?.trim().length > 0;
@@ -600,11 +554,8 @@ function JournalCard({ journal, folders, onEdit, onDelete, onMove, isDragOver, o
   return (
     <>
       <div
-        className="group relative rounded-2xl border transition-all duration-200 overflow-hidden cursor-pointer"
-        style={{
-          background: isDragOver ? "rgba(200,240,76,0.05)" : "#111",
-          borderColor: isDragOver ? "rgba(200,240,76,0.3)" : "rgba(255,255,255,0.08)",
-        }}
+        className="group relative rounded-2xl border border-white/8 hover:border-white/20 transition-all duration-200 overflow-hidden cursor-pointer"
+        style={{ background: "#111" }}
         onClick={() => onEdit(journal)}
         draggable
         onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; onDragStart(journal.id); }}
@@ -642,20 +593,18 @@ function JournalCard({ journal, folders, onEdit, onDelete, onMove, isDragOver, o
             )}
           </div>
         </div>
-
         {showConfirm && (
           <ConfirmModal
-            message={`Delete "${hasTitle ? journal.title : "this entry"}"?`}
-            onConfirm={() => { setShowConfirm(false); onDelete(journal.id); }}
+            message={`Move "${hasTitle ? journal.title : "this entry"}" to Recently Deleted?`}
+            confirmLabel="DELETE"
+            onConfirm={() => { setShowConfirm(false); onSoftDelete(journal.id); }}
             onCancel={() => setShowConfirm(false)}
           />
         )}
       </div>
-
       {showMove && (
         <MoveToFolderModal
-          journal={journal}
-          folders={folders}
+          journal={journal} folders={folders}
           onMove={(folderId) => { setShowMove(false); onMove(journal.id, folderId); }}
           onCancel={() => setShowMove(false)}
         />
@@ -664,73 +613,153 @@ function JournalCard({ journal, folders, onEdit, onDelete, onMove, isDragOver, o
   );
 }
 
+// ── Deleted Journal Card ──────────────────────────────────────────────────────
+
+function DeletedJournalCard({ journal, onRestore, onPermanentDelete }) {
+  const [showConfirm, setShowConfirm] = useState(false);
+  const hasTitle = journal.title?.trim().length > 0;
+
+  return (
+    <>
+      <div className="group relative rounded-2xl border border-white/6 overflow-hidden" style={{ background: "#0f0f0f" }}>
+        <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{ background: "rgba(239,68,68,0.2)" }} />
+        <div className="px-5 py-3 pl-6 flex items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="font-mono text-sm text-white/40 truncate">{hasTitle ? journal.title : <span className="italic">Untitled</span>}</p>
+            <p className="font-mono text-[10px] text-white/20 mt-0.5">
+              Deleted {formatDate(journal.deleted_at)} · {formatTime(journal.deleted_at)}
+            </p>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => onRestore(journal.id)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all hover:opacity-90 cursor-pointer"
+              style={{ background: "rgba(200,240,76,0.08)", border: "1px solid rgba(200,240,76,0.15)", color: "#c8f04c" }}
+            >
+              <RotateCcw size={10} /> RESTORE
+            </button>
+            <button
+              onClick={() => setShowConfirm(true)}
+              className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/20 hover:text-red-400 transition-all cursor-pointer"
+              title="Permanently delete"
+            >
+              <Trash size={11} />
+            </button>
+          </div>
+        </div>
+      </div>
+      {showConfirm && (
+        <ConfirmModal
+          message={`Permanently delete "${hasTitle ? journal.title : "this entry"}"? This cannot be undone.`}
+          confirmLabel="PERMANENTLY DELETE"
+          confirmColor="#ef4444"
+          onConfirm={() => { setShowConfirm(false); onPermanentDelete(journal.id); }}
+          onCancel={() => setShowConfirm(false)}
+        />
+      )}
+    </>
+  );
+}
+
+// ── Uncategorized Section (collapsible) ──────────────────────────────────────
+
+function UncategorizedSection({ journals, folders, onEdit, onSoftDelete, onMove, dragOverFolderId, onDragOver, onDragLeave, onDrop, onDragStart, onDragEnd }) {
+  const [open, setOpen] = useState(true);
+  const isDragOver = dragOverFolderId === "uncategorized";
+
+  return (
+    <div className="mb-6">
+      <div
+        className="flex items-center gap-2 px-3 py-2 mb-3 rounded-xl transition-all"
+        style={{ background: isDragOver ? "rgba(255,255,255,0.04)" : "transparent", border: isDragOver ? "1px solid rgba(255,255,255,0.12)" : "1px solid transparent" }}
+        onDragOver={(e) => { e.preventDefault(); onDragOver("uncategorized"); }}
+        onDragLeave={onDragLeave}
+        onDrop={(e) => { e.preventDefault(); onDrop(null); }}
+      >
+        <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer">
+          {open
+            ? <ChevronDown size={10} className="text-white/20 shrink-0" />
+            : <ChevronRight size={10} className="text-white/20 shrink-0" />
+          }
+          <BookOpen size={10} className="text-white/20" />
+          <span className="font-mono text-[10px] tracking-widest uppercase text-white/20">Uncategorized</span>
+          <span className="font-mono text-[10px] text-white/15">{journals.length}</span>
+        </button>
+      </div>
+
+      {open && (
+        <div className="space-y-2 pl-3">
+          {journals.length === 0 ? (
+            <div className="rounded-xl border border-dashed px-4 py-6 text-center transition-all"
+              style={{ borderColor: isDragOver ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.06)", background: isDragOver ? "rgba(255,255,255,0.03)" : "transparent" }}
+              onDragOver={(e) => { e.preventDefault(); onDragOver("uncategorized"); }}
+              onDragLeave={onDragLeave}
+              onDrop={(e) => { e.preventDefault(); onDrop(null); }}
+            >
+              <p className="font-mono text-[10px] text-white/15 tracking-widest">{isDragOver ? "Drop here" : "No uncategorized entries"}</p>
+            </div>
+          ) : (
+            journals.map((journal) => (
+              <JournalCard
+                key={journal.id} journal={journal} folders={folders}
+                onEdit={onEdit} onSoftDelete={onSoftDelete} onMove={onMove}
+                onDragStart={onDragStart} onDragEnd={onDragEnd}
+              />
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Folder Section ────────────────────────────────────────────────────────────
 
-function FolderSection({ folder, journals, folders, onEdit, onDelete, onDeleteFolder, onEditFolder, onMove, dragOverFolderId, onDragOver, onDragLeave, onDrop, onDragStart, onDragEnd }) {
+function FolderSection({ folder, journals, folders, onEdit, onSoftDelete, onDeleteFolder, onEditFolder, onMove, dragOverFolderId, onDragOver, onDragLeave, onDrop, onDragStart, onDragEnd }) {
   const [open, setOpen] = useState(true);
   const [showConfirm, setShowConfirm] = useState(false);
   const isDragOver = dragOverFolderId === folder.id;
 
   return (
     <div className="mb-6">
-      {/* Folder header */}
+      {/* Folder header — same style as SectionLabel */}
       <div
-        className="flex items-center gap-2 mb-3 group/folder rounded-xl px-3 py-2 transition-all"
-        style={{
-          background: isDragOver ? `${folder.color}10` : "transparent",
-          border: isDragOver ? `1px solid ${folder.color}30` : "1px solid transparent",
-        }}
+        className="flex items-center gap-2 px-3 py-2 mb-3 group/folder rounded-xl transition-all"
+        style={{ background: isDragOver ? `${folder.color}10` : "transparent", border: isDragOver ? `1px solid ${folder.color}30` : "1px solid transparent" }}
         onDragOver={(e) => { e.preventDefault(); onDragOver(folder.id); }}
         onDragLeave={onDragLeave}
         onDrop={(e) => { e.preventDefault(); onDrop(folder.id); }}
       >
         <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer">
           {open
-            ? <ChevronDown size={12} style={{ color: folder.color, opacity: 0.7 }} />
-            : <ChevronRight size={12} style={{ color: folder.color, opacity: 0.7 }} />
+            ? <ChevronDown size={10} style={{ color: folder.color, opacity: 0.7, flexShrink: 0 }} />
+            : <ChevronRight size={10} style={{ color: folder.color, opacity: 0.7, flexShrink: 0 }} />
           }
-          <div className="w-5 h-5 rounded flex items-center justify-center" style={{ background: `${folder.color}15` }}>
-            <FolderIcon icon={folder.icon} size={11} color={folder.color} />
-          </div>
-          <span className="font-mono text-xs font-medium truncate" style={{ color: folder.color }}>{folder.name}</span>
-          <span className="font-mono text-[10px] text-white/20 ml-1">{journals.length}</span>
+          <FolderIcon icon={folder.icon} size={10} color={folder.color} />
+          <span className="font-mono text-[10px] tracking-widest uppercase truncate" style={{ color: folder.color }}>{folder.name}</span>
+          <span className="font-mono text-[10px]" style={{ color: `${folder.color}60` }}>{journals.length}</span>
         </button>
-
-        {/* Folder actions */}
-        <div className="flex items-center gap-0.5 opacity-0 group-hover/folder:opacity-100 transition-opacity">
-          <button onClick={() => onEditFolder(folder)} className="p-1 rounded hover:bg-white/8 text-white/25 hover:text-white/60 transition-all cursor-pointer"><Pencil size={10} /></button>
-          <button onClick={() => setShowConfirm(true)} className="p-1 rounded hover:bg-red-500/10 text-white/25 hover:text-red-400 transition-all cursor-pointer"><Trash2 size={10} /></button>
+        <div className="flex items-center gap-0.5 opacity-0 group-hover/folder:opacity-100 transition-opacity ml-auto">
+          <button onClick={() => onEditFolder(folder)} className="p-1 rounded hover:bg-white/8 text-white/25 hover:text-white/60 transition-all cursor-pointer"><Pencil size={9} /></button>
+          <button onClick={() => setShowConfirm(true)} className="p-1 rounded hover:bg-red-500/10 text-white/25 hover:text-red-400 transition-all cursor-pointer"><Trash2 size={9} /></button>
         </div>
       </div>
 
-      {/* Journals in folder */}
       {open && (
         <div className="space-y-2 pl-3">
           {journals.length === 0 ? (
-            <div
-              className="rounded-xl border border-dashed px-4 py-6 text-center transition-all"
+            <div className="rounded-xl border border-dashed px-4 py-6 text-center transition-all"
               style={{ borderColor: isDragOver ? folder.color : "rgba(255,255,255,0.08)", background: isDragOver ? `${folder.color}05` : "transparent" }}
               onDragOver={(e) => { e.preventDefault(); onDragOver(folder.id); }}
               onDragLeave={onDragLeave}
-              onDrop={(e) => { e.preventDefault(); onDrop(folder.id); }}
-            >
-              <p className="font-mono text-[10px] text-white/20 tracking-widest">
-                {isDragOver ? "Drop here" : "No entries yet — drag journals here"}
-              </p>
+              onDrop={(e) => { e.preventDefault(); onDrop(folder.id); }}>
+              <p className="font-mono text-[10px] text-white/20 tracking-widest">{isDragOver ? "Drop here" : "No entries — drag journals here"}</p>
             </div>
           ) : (
             journals.map((journal) => (
-              <JournalCard
-                key={journal.id}
-                journal={journal}
-                folders={folders}
-                onEdit={onEdit}
-                onDelete={onDelete}
-                onMove={onMove}
-                isDragOver={false}
-                onDragStart={onDragStart}
-                onDragEnd={onDragEnd}
-              />
+              <JournalCard key={journal.id} journal={journal} folders={folders}
+                onEdit={onEdit} onSoftDelete={onSoftDelete} onMove={onMove}
+                onDragStart={onDragStart} onDragEnd={onDragEnd} />
             ))
           )}
         </div>
@@ -747,58 +776,287 @@ function FolderSection({ folder, journals, folders, onEdit, onDelete, onDeleteFo
   );
 }
 
+// ── Deleted Folder Card ───────────────────────────────────────────────────────
+
+function DeletedFolderCard({ folder, journals, onRestoreFolder, onPermanentDeleteFolder, onRestoreJournal, onPermanentDeleteJournal }) {
+  const [open, setOpen] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  return (
+    <>
+      <div className="rounded-2xl border border-white/6 overflow-hidden" style={{ background: "#0f0f0f" }}>
+        {/* Folder row */}
+        <div className="flex items-center gap-3 px-5 py-3 pl-6">
+          <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l" style={{ background: `${folder.color}30` }} />
+          <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer">
+            {open
+              ? <ChevronDown size={10} style={{ color: folder.color, opacity: 0.5, flexShrink: 0 }} />
+              : <ChevronRight size={10} style={{ color: folder.color, opacity: 0.5, flexShrink: 0 }} />
+            }
+            <div className="w-5 h-5 rounded flex items-center justify-center shrink-0" style={{ background: `${folder.color}15` }}>
+              <FolderIcon icon={folder.icon} size={10} color={folder.color} />
+            </div>
+            <span className="font-mono text-sm truncate" style={{ color: `${folder.color}80` }}>{folder.name}</span>
+            <span className="font-mono text-[10px] ml-1" style={{ color: `${folder.color}40` }}>{journals.length} entries</span>
+          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => onRestoreFolder(folder.id)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all hover:opacity-90 cursor-pointer"
+              style={{ background: "rgba(200,240,76,0.08)", border: "1px solid rgba(200,240,76,0.15)", color: "#c8f04c" }}
+            >
+              <RotateCcw size={10} /> RESTORE
+            </button>
+            <button
+              onClick={() => setShowConfirm(true)}
+              className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/20 hover:text-red-400 transition-all cursor-pointer"
+              title="Permanently delete folder"
+            >
+              <Trash size={11} />
+            </button>
+          </div>
+        </div>
+
+        {/* Journals inside deleted folder */}
+        {open && (
+          <div className="border-t border-white/5">
+            {journals.length === 0 ? (
+              <p className="font-mono text-[10px] text-white/15 tracking-widest px-5 py-4 pl-10">No entries in this folder</p>
+            ) : (
+              journals.map((journal) => {
+                const hasTitle = journal.title?.trim().length > 0;
+                return (
+                  <div key={journal.id} className="flex items-center gap-3 px-5 py-2.5 pl-10 border-b border-white/4 last:border-none">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-mono text-xs text-white/35 truncate">{hasTitle ? journal.title : <span className="italic">Untitled</span>}</p>
+                      <p className="font-mono text-[10px] text-white/15 mt-0.5">{formatDate(journal.updated_at)}</p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => onRestoreJournal(journal.id)}
+                        className="flex items-center gap-1 px-2 py-1 rounded font-mono text-[9px] tracking-widest transition-all hover:opacity-90 cursor-pointer"
+                        style={{ background: "rgba(200,240,76,0.06)", border: "1px solid rgba(200,240,76,0.1)", color: "rgba(200,240,76,0.6)" }}
+                      >
+                        <RotateCcw size={9} /> RESTORE
+                      </button>
+                      <button onClick={() => onPermanentDeleteJournal(journal.id)} className="p-1 rounded hover:bg-red-500/10 text-white/15 hover:text-red-400 transition-all cursor-pointer"><Trash size={10} /></button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+      </div>
+
+      {showConfirm && (
+        <ConfirmModal
+          message={`Permanently delete folder "${folder.name}" and all its entries? This cannot be undone.`}
+          confirmLabel="PERMANENTLY DELETE"
+          confirmColor="#ef4444"
+          onConfirm={() => { setShowConfirm(false); onPermanentDeleteFolder(folder.id); }}
+          onCancel={() => setShowConfirm(false)}
+        />
+      )}
+    </>
+  );
+}
+
+// ── Recently Deleted Section ──────────────────────────────────────────────────
+
+function RecentlyDeletedSection({ deletedJournals, deletedFolders, journalsInDeletedFolders, onRestoreJournal, onPermanentDeleteJournal, onRestoreFolder, onPermanentDeleteFolder, onClearAll }) {
+  const [open, setOpen] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const totalCount = deletedJournals.length + deletedFolders.length;
+
+  return (
+    <div className="mt-8 mb-6">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+      </div>
+
+      <div className="flex items-center gap-2 px-3 py-2 mb-3">
+        <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer">
+          {open
+            ? <ChevronDown size={10} className="text-white/20 shrink-0" />
+            : <ChevronRight size={10} className="text-white/20 shrink-0" />
+          }
+          <Trash size={10} className="text-white/20" />
+          <span className="font-mono text-[10px] tracking-widest uppercase text-white/20">Recently Deleted</span>
+          <span className="font-mono text-[10px] text-white/15">{totalCount}</span>
+        </button>
+        {open && totalCount > 0 && (
+          <button onClick={() => setShowClearConfirm(true)} className="font-mono text-[9px] tracking-widest text-red-400/50 hover:text-red-400 transition-colors cursor-pointer ml-auto">
+            DELETE ALL
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <div className="space-y-2 pl-3">
+          {totalCount === 0 ? (
+            <div className="rounded-xl border border-dashed px-4 py-6 text-center" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+              <p className="font-mono text-[10px] text-white/15 tracking-widest">No deleted entries</p>
+            </div>
+          ) : (
+            <>
+              {/* Deleted folders */}
+              {deletedFolders.map((folder) => (
+                <DeletedFolderCard
+                  key={folder.id}
+                  folder={folder}
+                  journals={journalsInDeletedFolders.filter(j => j.folder_id === folder.id)}
+                  onRestoreFolder={onRestoreFolder}
+                  onPermanentDeleteFolder={onPermanentDeleteFolder}
+                  onRestoreJournal={onRestoreJournal}
+                  onPermanentDeleteJournal={onPermanentDeleteJournal}
+                />
+              ))}
+              {/* Deleted journals (not in a deleted folder) */}
+              {deletedJournals.map((journal) => (
+                <DeletedJournalCard
+                  key={journal.id}
+                  journal={journal}
+                  onRestore={onRestoreJournal}
+                  onPermanentDelete={onPermanentDeleteJournal}
+                />
+              ))}
+            </>
+          )}
+        </div>
+      )}
+
+      {showClearConfirm && (
+        <ConfirmModal
+          message={`Permanently delete all ${totalCount} items in Recently Deleted? This cannot be undone.`}
+          confirmLabel="DELETE ALL"
+          confirmColor="#ef4444"
+          onConfirm={() => { setShowClearConfirm(false); onClearAll(); }}
+          onCancel={() => setShowClearConfirm(false)}
+        />
+      )}
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function Journals() {
   const [journals, setJournals] = useState([]);
+  const [deletedJournals, setDeletedJournals] = useState([]);
   const [folders, setFolders] = useState([]);
+  const [deletedFolders, setDeletedFolders] = useState([]);
+  const [journalsInDeletedFolders, setJournalsInDeletedFolders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
   const [editing, setEditing] = useState(null);
   const [quote] = useState(randomQuote);
-
-  // Folder modal
   const [showFolderModal, setShowFolderModal] = useState(false);
   const [editingFolder, setEditingFolder] = useState(null);
-
-  // Drag state
   const [draggingJournalId, setDraggingJournalId] = useState(null);
   const [dragOverFolderId, setDragOverFolderId] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [journalData, folderData] = await Promise.all([getJournals(), getFolders()]);
-      setJournals(journalData || []);
+      const [journalData, deletedJournalData, folderData, deletedFolderData] = await Promise.all([
+        getJournals(), getDeletedJournals(), getFolders(), getDeletedFolders(),
+      ]);
+      const activeFolderIds = new Set((folderData || []).map(f => f.id));
+      // Journals in deleted folders — still have folder_id but folder is soft-deleted
+      const deletedFolderIds = new Set((deletedFolderData || []).map(f => f.id));
+      const inDeletedFolders = (journalData || []).filter(j => j.folder_id && deletedFolderIds.has(j.folder_id));
+      const activeJournals = (journalData || []).filter(j => !j.folder_id || activeFolderIds.has(j.folder_id));
+      setJournals(activeJournals);
+      setDeletedJournals(deletedJournalData || []);
       setFolders(folderData || []);
-    } catch (e) {
-      setPageError(e.message);
-    } finally {
-      setLoading(false);
-    }
+      setDeletedFolders(deletedFolderData || []);
+      setJournalsInDeletedFolders(inDeletedFolders);
+    } catch (e) { setPageError(e.message); } finally { setLoading(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  async function handleDelete(id) {
+  async function handleSoftDelete(id) {
     try {
-      await deleteJournal(id);
-      setJournals((prev) => prev.filter((j) => j.id !== id));
+      await softDeleteJournal(id);
+      const j = journals.find(x => x.id === id);
+      setJournals(prev => prev.filter(x => x.id !== id));
+      if (j) setDeletedJournals(prev => [{ ...j, deleted_at: new Date().toISOString() }, ...prev]);
+    } catch (e) { setPageError(e.message); }
+  }
+
+  async function handleRestoreJournal(id) {
+    try {
+      await restoreJournal(id);
+      // Check both deletedJournals and journalsInDeletedFolders
+      const j = deletedJournals.find(x => x.id === id) || journalsInDeletedFolders.find(x => x.id === id);
+      setDeletedJournals(prev => prev.filter(x => x.id !== id));
+      setJournalsInDeletedFolders(prev => prev.filter(x => x.id !== id));
+      // Restore to uncategorized since its folder may be deleted
+      if (j) setJournals(prev => [{ ...j, deleted_at: null, folder_id: null }, ...prev]);
+    } catch (e) { setPageError(e.message); }
+  }
+
+  async function handlePermanentDeleteJournal(id) {
+    try {
+      await permanentDeleteJournal(id);
+      setDeletedJournals(prev => prev.filter(x => x.id !== id));
+      setJournalsInDeletedFolders(prev => prev.filter(x => x.id !== id));
+    } catch (e) { setPageError(e.message); }
+  }
+
+  async function handleRestoreFolder(id) {
+    try {
+      await restoreFolder(id);
+      const f = deletedFolders.find(x => x.id === id);
+      setDeletedFolders(prev => prev.filter(x => x.id !== id));
+      if (f) setFolders(prev => [...prev, { ...f, deleted_at: null }]);
+      // Move journals that belong to this folder back to active list
+      const rejoined = journalsInDeletedFolders.filter(j => j.folder_id === id);
+      setJournalsInDeletedFolders(prev => prev.filter(j => j.folder_id !== id));
+      setJournals(prev => [...prev, ...rejoined]);
+    } catch (e) { setPageError(e.message); }
+  }
+
+  async function handlePermanentDeleteFolder(id) {
+    try {
+      await permanentDeleteFolder(id);
+      setDeletedFolders(prev => prev.filter(x => x.id !== id));
+      setJournalsInDeletedFolders(prev => prev.filter(j => j.folder_id !== id));
     } catch (e) { setPageError(e.message); }
   }
 
   async function handleDeleteFolder(id) {
     try {
-      await deleteFolder(id);
-      setFolders((prev) => prev.filter((f) => f.id !== id));
-      setJournals((prev) => prev.map((j) => j.folder_id === id ? { ...j, folder_id: null } : j));
+      await softDeleteFolder(id);
+      const f = folders.find(x => x.id === id);
+      setFolders(prev => prev.filter(x => x.id !== id));
+      if (f) setDeletedFolders(prev => [{ ...f, deleted_at: new Date().toISOString() }, ...prev]);
+      // Move journals of this folder to journalsInDeletedFolders (hidden from main view)
+      const affected = journals.filter(j => j.folder_id === id);
+      setJournals(prev => prev.filter(j => j.folder_id !== id));
+      setJournalsInDeletedFolders(prev => [...prev, ...affected]);
+    } catch (e) { setPageError(e.message); }
+  }
+
+  async function handleClearAll() {
+    try {
+      await Promise.all([
+        ...deletedJournals.map(j => permanentDeleteJournal(j.id)),
+        ...deletedFolders.map(f => permanentDeleteFolder(f.id)),
+        ...journalsInDeletedFolders.map(j => permanentDeleteJournal(j.id)),
+      ]);
+      setDeletedJournals([]);
+      setDeletedFolders([]);
+      setJournalsInDeletedFolders([]);
     } catch (e) { setPageError(e.message); }
   }
 
   async function handleMove(journalId, folderId) {
     try {
       await moveJournalToFolder(journalId, folderId);
-      setJournals((prev) => prev.map((j) => j.id === journalId ? { ...j, folder_id: folderId } : j));
+      setJournals(prev => prev.map(j => j.id === journalId ? { ...j, folder_id: folderId } : j));
     } catch (e) { setPageError(e.message); }
   }
 
@@ -808,9 +1066,8 @@ export default function Journals() {
     setDragOverFolderId(null);
   }
 
-  // Group journals
-  const uncategorized = journals.filter((j) => !j.folder_id);
-  const byFolder = (folderId) => journals.filter((j) => j.folder_id === folderId);
+  const uncategorized = journals.filter(j => !j.folder_id);
+  const byFolder = (fid) => journals.filter(j => j.folder_id === fid);
 
   if (editing !== null) {
     return (
@@ -874,7 +1131,7 @@ export default function Journals() {
           <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 mb-4">
             <AlertTriangle size={13} className="text-red-400 shrink-0" />
             <span className="font-mono text-xs text-red-400 flex-1">{pageError}</span>
-            <button onClick={() => setPageError("")} className="text-red-400/60 hover:text-red-400 transition-colors cursor-pointer"><X size={13} /></button>
+            <button onClick={() => setPageError("")} className="text-red-400/60 hover:text-red-400 cursor-pointer"><X size={13} /></button>
           </div>
         )}
 
@@ -900,7 +1157,7 @@ export default function Journals() {
                 journals={byFolder(folder.id)}
                 folders={folders}
                 onEdit={(j) => setEditing(j)}
-                onDelete={handleDelete}
+                onSoftDelete={handleSoftDelete}
                 onDeleteFolder={handleDeleteFolder}
                 onEditFolder={(f) => { setEditingFolder(f); setShowFolderModal(true); }}
                 onMove={handleMove}
@@ -913,38 +1170,27 @@ export default function Journals() {
               />
             ))}
 
-            {/* Uncategorized */}
-            {uncategorized.length > 0 && (
-              <div className="mb-6">
-                {folders.length > 0 && (
-                  <div className="flex items-center gap-2 mb-3 px-3 py-2">
-                    <BookOpen size={11} className="text-white/20" />
-                    <span className="font-mono text-[10px] tracking-widest text-white/20 uppercase">Uncategorized</span>
-                    <span className="font-mono text-[10px] text-white/15">{uncategorized.length}</span>
-                  </div>
-                )}
-                <div className="space-y-2">
-                  {uncategorized.map((journal) => (
-                    <JournalCard
-                      key={journal.id}
-                      journal={journal}
-                      folders={folders}
-                      onEdit={(j) => setEditing(j)}
-                      onDelete={handleDelete}
-                      onMove={handleMove}
-                      isDragOver={false}
-                      onDragStart={(id) => setDraggingJournalId(id)}
-                      onDragEnd={() => { setDraggingJournalId(null); setDragOverFolderId(null); }}
-                    />
-                  ))}
-                </div>
-              </div>
+            {/* Uncategorized — collapsible, always shown when folders exist */}
+            {(folders.length > 0 || uncategorized.length > 0) && (
+              <UncategorizedSection
+                journals={uncategorized}
+                folders={folders}
+                onEdit={(j) => setEditing(j)}
+                onSoftDelete={handleSoftDelete}
+                onMove={handleMove}
+                dragOverFolderId={dragOverFolderId}
+                onDragOver={(fid) => setDragOverFolderId(fid)}
+                onDragLeave={() => setDragOverFolderId(null)}
+                onDrop={handleDrop}
+                onDragStart={(id) => setDraggingJournalId(id)}
+                onDragEnd={() => { setDraggingJournalId(null); setDragOverFolderId(null); }}
+              />
             )}
 
-            {/* Empty folders hint */}
+            {/* No live journals but folders exist */}
             {journals.length === 0 && folders.length > 0 && (
               <div className="text-center py-12">
-                <p className="font-mono text-white/20 text-xs tracking-widest mb-4">Folders created — write your first entry</p>
+                <p className="font-mono text-white/20 text-xs tracking-widest mb-4">Write your first entry</p>
                 <button onClick={() => setEditing({})} className="px-5 py-2.5 rounded-xl font-mono text-xs tracking-widest cursor-pointer" style={{ background: "#c8f04c", color: "#0d0d0d" }}>
                   NEW ENTRY
                 </button>
@@ -952,9 +1198,20 @@ export default function Journals() {
             )}
           </>
         )}
+
+        {/* Recently Deleted — always visible */}
+        <RecentlyDeletedSection
+          deletedJournals={deletedJournals}
+          deletedFolders={deletedFolders}
+          journalsInDeletedFolders={journalsInDeletedFolders}
+          onRestoreJournal={handleRestoreJournal}
+          onPermanentDeleteJournal={handlePermanentDeleteJournal}
+          onRestoreFolder={handleRestoreFolder}
+          onPermanentDeleteFolder={handlePermanentDeleteFolder}
+          onClearAll={handleClearAll}
+        />
       </div>
 
-      {/* Folder modal */}
       {showFolderModal && (
         <FolderModal
           folder={editingFolder}
