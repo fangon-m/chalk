@@ -573,7 +573,7 @@ function RoadmapView({ mission, onBack, onUpdate, allStreaks }) {
           <div className="flex items-center gap-1 text-white/30">
             <Calendar size={12} />
             <span className="font-mono text-xs">
-              {mission.timeline ? new Date(mission.timeline).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "No date"}
+              {mission.timeline ? new Date(mission.timeline).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) : "No date"}
             </span>
           </div>
         </div>
@@ -756,24 +756,22 @@ function MissionCard({ mission, index, onSelect, onEdit, onDelete, dragging, onD
           <span className="font-mono text-xs text-white/40 tabular-nums w-8 text-right">{mission.progress}%</span>
         </div>
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1 text-white/25">
-              <Milestone size={11} />
-              <span className="font-mono text-[10px]">{mission.milestones.length} {mission.milestones.length === 1 ? "milestone" : "milestones"}</span>
-            </div>
-            {mission.timeline && (
-              <div className="flex items-center gap-1 text-white/25">
-                <Calendar size={12} />
-                <span className="font-mono text-[10px]">
-                  {new Date(mission.timeline).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
-                </span>
-              </div>
-            )}
+        <div className="grid grid-cols-3 items-center h-5">
+          <div className="flex items-center gap-2 text-white/25 whitespace-nowrap">
+            <Milestone size={11} className="shrink-0 -mt-0.5" />
+            <span className="font-mono text-[10px] leading-none">{mission.milestones.length} {mission.milestones.length === 1 ? "milestone" : "milestones"}</span>
           </div>
+          {mission.timeline && (
+            <div className="flex items-center gap-2 text-white/25 whitespace-nowrap -ml-14">
+              <Calendar size={10} className="shrink-0 -mt-0.5" />
+              <span className="font-mono text-[10px] leading-none">
+                {new Date(mission.timeline).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
+              </span>
+            </div>
+          )}
           <button
             onClick={(e) => { e.stopPropagation(); onSelect(mission); }}
-            className="flex items-center gap-1 font-mono text-[10px] tracking-widest text-white/35 hover:text-[#c8f04c] transition-colors"
+            className="flex items-center justify-end gap-1 font-mono text-[10px] tracking-widest text-white/35 hover:text-[#c8f04c] transition-colors"
           >
             ROADMAP <ChevronRight size={10} />
           </button>

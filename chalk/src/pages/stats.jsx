@@ -40,7 +40,7 @@ const QUOTES = [
   { text: "My magic is never giving up.", author: "Asta" },
   { text: "Not everyone who works hard is rewarded. But all those who succeed have worked hard.", author: "Genji Kamogawa" },
   { text: "There is no tomorrow.", author: "Apollo Creed" },
-  { text: "You before anyone else.", author: "Chalk Dev" },
+  { text: "You have no limits.", author: "Chalk Dev" },
 ];
 
 function getDailyQuote() {
