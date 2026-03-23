@@ -6,7 +6,7 @@ import {
   List, ListOrdered, Quote, Minus, Code, Heading1, Heading2,
   Cloud, CloudOff, CloudUpload, Undo, Redo,
   Folder, FolderPlus, ChevronDown, ChevronRight,
-  Move, RotateCcw, Trash,
+  Move, RotateCcw, Trash, Star, Heart, Sun, Moon, Flame, Music,
 } from "lucide-react";
 import { useEditor, EditorContent, Mark, mergeAttributes } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -61,7 +61,7 @@ const THEMES = [
 ];
 const ZOOM_LEVELS = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
 const FOLDER_COLORS = ["#c8f04c","#60a5fa","#f97316","#ef4444","#a78bfa","#34d399","#f472b6","#fbbf24"];
-const FOLDER_ICONS  = ["folder","book","star","heart","lock","sun","moon","zap"];
+const FOLDER_ICONS  = ["folder","book","star","heart","sun","moon","flame","music"];
 
 const DEFAULT_TYPO = { font: "'DM Mono', monospace", size: "15px", theme: THEMES[0], zoom: 1.0 };
 const AUTOSAVE_DELAY = 2000;
@@ -159,12 +159,12 @@ function FolderIcon({ icon, size = 14, color }) {
   const props = { size, style: { color } };
   switch (icon) {
     case "book":  return <BookOpen {...props} />;
-    case "star":  return <span style={{ fontSize: size, color }}>★</span>;
-    case "heart": return <span style={{ fontSize: size, color }}>♥</span>;
-    case "lock":  return <span style={{ fontSize: size, color }}>🔒</span>;
-    case "sun":   return <span style={{ fontSize: size, color }}>☀</span>;
-    case "moon":  return <span style={{ fontSize: size, color }}>☽</span>;
-    case "zap":   return <span style={{ fontSize: size, color }}>⚡</span>;
+    case "star":  return <Star {...props} />;
+    case "heart": return <Heart {...props} />;
+    case "sun":   return <Sun {...props} />;
+    case "moon":  return <Moon {...props} />;
+    case "flame": return <Flame {...props} />;
+    case "music": return <Music {...props} />;
     default:      return <Folder {...props} />;
   }
 }
@@ -327,7 +327,7 @@ function MoveToFolderModal({ journal, folders, onMove, onCancel }) {
             {journal.folder_id === null && <span className="ml-auto font-mono text-[9px] text-white/25">current</span>}
           </button>
           {folders.map((folder) => (
-            <button key={folder.id} onClick={() => onMove(folder.id)} className="w-full flex items-center gap-3 px-5 py-3 hover:bg-white/5 transition-colors text-left cursor-pointer">
+            <button key={folder.id} onClick={() => onMove(folder.id)} className="w-full flex items-center px-5 py-3 hover:bg-white/5 transition-colors text-left cursor-pointer">
               <div className="w-6 h-6 rounded flex items-center justify-center" style={{ background: `${folder.color}15` }}><FolderIcon icon={folder.icon} size={12} color={folder.color} /></div>
               <span className="font-mono text-xs text-white/70">{folder.name}</span>
               {journal.folder_id === folder.id && <span className="ml-auto font-mono text-[9px] text-white/25">current</span>}
@@ -374,11 +374,31 @@ function FolderModal({ folder, onClose, onSave }) {
           </div>
           <div>
             <label className="block font-mono text-[10px] tracking-widest text-white/40 uppercase mb-2">Color</label>
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2 flex-wrap items-center">
               {FOLDER_COLORS.map((c) => (
                 <button key={c} onClick={() => setForm({ ...form, color: c })} className="w-7 h-7 rounded-lg transition-all cursor-pointer"
                   style={{ background: c, outline: form.color === c ? `2px solid ${c}` : "none", outlineOffset: 2, opacity: form.color === c ? 1 : 0.5 }} />
               ))}
+              {/* Custom color — same size as quick colors, opens native picker */}
+              <label
+                className="w-7 h-7 rounded-lg cursor-pointer relative transition-all flex items-center justify-center"
+                title="Custom color"
+                style={{
+                  background: FOLDER_COLORS.includes(form.color) ? "rgba(255,255,255,0.07)" : form.color,
+                  border: FOLDER_COLORS.includes(form.color) ? "1px dashed rgba(255,255,255,0.2)" : "none",
+                  outline: !FOLDER_COLORS.includes(form.color) ? `2px solid ${form.color}` : "none",
+                  outlineOffset: 2,
+                }}
+              >
+                <span style={{ fontSize: 14, lineHeight: 1, color: FOLDER_COLORS.includes(form.color) ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.5)", pointerEvents: "none" }}>+</span>
+                <input type="color" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })}
+                  style={{ position: "absolute", inset: 0, opacity: 0, width: "100%", height: "100%", cursor: "pointer", border: "none", padding: 0 }} />
+              </label>
+            </div>
+            {/* Current hex */}
+            <div className="flex items-center gap-1.5 mt-2">
+              <div className="w-3.5 h-3.5 rounded" style={{ background: form.color }} />
+              <span className="font-mono text-[10px] text-white/30">{form.color.toUpperCase()}</span>
             </div>
           </div>
           <div>
