@@ -266,10 +266,10 @@ export default function Dashboard() {
 
         {/* Grid Layout: Top Cards */}
         <div className="grid grid-cols-1 gap-4 mb-4">
-          {/* ── Life Score Card (from Stats) ── */}
+          {/* ── Daily Card  ── */}
           <div
             className="rounded-2xl border mb-4 overflow-hidden"
-            style={{ background: "#111", borderColor: isComplete ? "rgba(200,240,76,0.25)" : "rgba(255,255,255,0.08)" }}
+            style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)" }}
           >
             {isComplete && <div className="h-0.5 w-full" style={{ background: "#c8f04c" }} />}
             <div className="px-6 py-6">
