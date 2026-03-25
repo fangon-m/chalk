@@ -1,7 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { House, Flame, Award, Target, CheckCircle2, AlertTriangle, X, ChevronRight } from "lucide-react";
+import {
+  House, Flame, Award, Target, CheckCircle2,
+  AlertTriangle, X, BookOpen, Shield,
+  Loader2, Check, ChevronLeft, ChevronRight,
+} from "lucide-react";
 import { supabase } from "../lib/supabase";
-import Sidebar from "../components/sidebar";
+import { checkInStreak, getMissionIdsForStreak } from "../lib/streaks";
+import { recalculateMissionProgress } from "../lib/missions";
 
 // ── Daily Quote ───────────────────────────────────────────────────────────────
 
@@ -46,44 +51,32 @@ function getDailyQuote() {
   return QUOTES[seed % QUOTES.length];
 }
 
-function getMonthRange() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const firstDay = new Date(year, month, 1).toISOString().slice(0, 10);
-  const today = now.toISOString().slice(0, 10);
-  const daysElapsed = now.getDate();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const monthName = now.toLocaleString("en-US", { month: "long" });
-  return { firstDay, today, daysElapsed, daysInMonth, monthName, year };
-}
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function getFlameColor(count) {
   if (count >= 50) return "#c8f04c";
   if (count >= 21) return "#ef4444";
   if (count >= 11) return "#f97316";
-  if (count >= 3) return "#eab308";
+  if (count >= 3)  return "#eab308";
   return "#6b7280";
 }
 
 function getPriorityColor(priority) {
   switch (priority) {
     case "critical": return "#ef4444";
-    case "high": return "#f97316";
-    case "medium": return "#eab308";
-    case "low": return "#6b7280";
-    default: return "#c8f04c";
+    case "high":     return "#f97316";
+    case "medium":   return "#eab308";
+    case "low":      return "#6b7280";
+    default:         return "#c8f04c";
   }
 }
 
-function getPriorityLabel(priority) {
-  switch (priority) {
-    case "critical": return "CRITICAL";
-    case "high": return "HIGH";
-    case "medium": return "MED";
-    case "low": return "LOW";
-    default: return "—";
-  }
+function formatDate(iso) {
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatTime(iso) {
+  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
 // ── Life Score Ring ───────────────────────────────────────────────────────────
@@ -123,44 +116,31 @@ function LifeScoreRing({ score, isComplete }) {
   );
 }
 
-// ── Streak Row ────────────────────────────────────────────────────────────────
+// ── Pagination ────────────────────────────────────────────────────────────────
 
-function StreakCheckIn({ streak, checkedInToday }) {
+function Pagination({ page, totalPages, onChange }) {
+  if (totalPages <= 1) return null;
   return (
-    <div className="flex items-center gap-3 py-2.5 px-3 rounded-lg" style={{ background: "rgba(255,255,255,0.02)" }}>
-      <Flame size={10} style={{ color: getFlameColor(streak.current_streak ?? 0), flexShrink: 0 }} />
-      <div className="flex-1 min-w-0">
-        <p className="font-mono text-xs text-white truncate">{streak.name}</p>
-        <p className="font-mono text-[10px] text-white/30">{streak.current_streak} streak</p>
-      </div>
-      {checkedInToday ? (
-        <CheckCircle2 size={13} style={{ color: "#c8f04c", flexShrink: 0 }} />
-      ) : (
-        <div className="w-5 h-5 rounded border-2" style={{ borderColor: "rgba(255,255,255,0.15)" }} />
-      )}
-    </div>
-  );
-}
-
-// ── Mission Snapshot ──────────────────────────────────────────────────────────
-
-function MissionSnapshot({ mission }) {
-  const progress = Math.round(mission.progress ?? 0);
-  const color = getPriorityColor(mission.priority);
-  const totalMilestones = mission.milestones?.length ?? 0;
-  const doneMilestones = mission.milestones?.filter((m) => m.completed).length ?? 0;
-  const isFinished = progress >= 100;
-
-  return (
-    <div className="py-2">
-      <div className="flex items-center gap-2 mb-1.5">
-        <div className="w-1 h-4 rounded shrink-0" style={{ background: color }} />
-        <span className="font-mono text-xs text-white truncate flex-1">{mission.title}</span>
-        <span className="font-mono text-[9px]" style={{ color }}>{progress}%</span>
-      </div>
-      <div className="h-1 rounded-full overflow-hidden ml-3" style={{ background: "rgba(255,255,255,0.06)" }}>
-        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${progress}%`, background: color }} />
-      </div>
+    <div className="flex items-center justify-between px-5 py-3 border-t border-white/6">
+      <button
+        onClick={() => onChange(page - 1)}
+        disabled={page === 0}
+        className="flex items-center gap-1 font-mono text-[10px] tracking-widest transition-colors disabled:opacity-20 cursor-pointer disabled:cursor-default"
+        style={{ color: "rgba(255,255,255,0.35)" }}
+      >
+        <ChevronLeft size={11} /> PREV
+      </button>
+      <span className="font-mono text-[10px] text-white/25">
+        {page + 1} / {totalPages}
+      </span>
+      <button
+        onClick={() => onChange(page + 1)}
+        disabled={page === totalPages - 1}
+        className="flex items-center gap-1 font-mono text-[10px] tracking-widest transition-colors disabled:opacity-20 cursor-pointer disabled:cursor-default"
+        style={{ color: "rgba(255,255,255,0.35)" }}
+      >
+        NEXT <ChevronRight size={11} />
+      </button>
     </div>
   );
 }
@@ -169,45 +149,48 @@ function MissionSnapshot({ mission }) {
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [pageError, setPageError] = useState("");
   const [streaks, setStreaks] = useState([]);
-  const [todayCheckIns, setTodayCheckIns] = useState({});
+  const [todayCheckIns, setTodayCheckIns] = useState(new Set());
   const [missions, setMissions] = useState([]);
+  const [journals, setJournals] = useState([]);
+  const [checkingIn, setCheckingIn] = useState(null);
 
-  const { today, monthName, year } = getMonthRange();
+  // Pagination
+  const PAGE_SIZE = 5;
+  const [streakPage, setStreakPage]   = useState(0);
+  const [missionPage, setMissionPage] = useState(0);
+
+  const today = new Date().toISOString().slice(0, 10);
   const dailyQuote = getDailyQuote();
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError("");
+    setPageError("");
     try {
-      // Get all streaks
-      const { data: streakData, error: streakErr } = await supabase
-        .from("streaks").select("*").order("created_at", { ascending: true });
+      const [
+        { data: streakData, error: streakErr },
+        { data: logsData,   error: logsErr   },
+        { data: missionData,error: missionErr},
+        { data: journalData,error: journalErr},
+      ] = await Promise.all([
+        supabase.from("streaks").select("*").order("created_at", { ascending: true }),
+        supabase.from("streak_logs").select("streak_id").eq("date", today),
+        supabase.from("missions").select("id, title, priority, progress, milestones(id, completed)").order("priority", { ascending: true }),
+        supabase.from("journals").select("id, title, created_at, updated_at").is("deleted_at", null).order("updated_at", { ascending: false }).limit(3),
+      ]);
+
       if (streakErr) throw streakErr;
-
-      // Get today's check-ins
-      const { data: logsData, error: logsErr } = await supabase
-        .from("streak_logs")
-        .select("streak_id")
-        .eq("date", today);
-      if (logsErr) throw logsErr;
-
-      const checkedInSet = new Set(logsData?.map(l => l.streak_id) || []);
-
-      // Get missions
-      const { data: missionData, error: missionErr } = await supabase
-        .from("missions")
-        .select("id, title, priority, progress, milestones(id, completed)")
-        .order("priority", { ascending: true })
-        .limit(5);
+      if (logsErr)   throw logsErr;
       if (missionErr) throw missionErr;
+      if (journalErr) throw journalErr;
 
       setStreaks(streakData || []);
-      setTodayCheckIns(checkedInSet);
+      setTodayCheckIns(new Set((logsData || []).map(l => l.streak_id)));
       setMissions(missionData || []);
+      setJournals(journalData || []);
     } catch (e) {
-      setError(e.message);
+      setPageError(e.message);
     } finally {
       setLoading(false);
     }
@@ -215,25 +198,45 @@ export default function Dashboard() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Calculate life score for today
-  const checkedInToday = Array.from(todayCheckIns).length;
-  const totalStreaks = streaks.length;
-  const lifeScoreToday = totalStreaks > 0 ? Math.round((checkedInToday / totalStreaks) * 100) : 0;
-  const isComplete = lifeScoreToday === 100 && totalStreaks > 0;
-
-  // Get top missions
-  const topMissions = missions.slice(0, 3);
-
-  // Stats for life score card
-  const perfectCount = streaks.filter((s) => todayCheckIns.has(s.id)).length;
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "#0d0d0d" }}>
-        <p className="font-mono text-white/20 text-xs tracking-widest animate-pulse">LOADING...</p>
-      </div>
-    );
+  async function handleCheckIn(streakId) {
+    if (checkingIn || todayCheckIns.has(streakId)) return;
+    setCheckingIn(streakId);
+    try {
+      await checkInStreak(streakId);
+      setTodayCheckIns(prev => new Set([...prev, streakId]));
+      // Refresh streak counts
+      const { data } = await supabase.from("streaks").select("*").order("created_at", { ascending: true });
+      if (data) setStreaks(data);
+      // Recalculate connected missions silently
+      const missionIds = await getMissionIdsForStreak(streakId);
+      if (missionIds.length > 0) {
+        Promise.all(missionIds.map(mid => recalculateMissionProgress(mid))).catch(() => {});
+      }
+    } catch (e) {
+      setPageError(e.message);
+    } finally {
+      setCheckingIn(null);
+    }
   }
+
+  const checkedInCount = todayCheckIns.size;
+  const totalStreaks   = streaks.length;
+  const lifeScore      = totalStreaks > 0 ? Math.round((checkedInCount / totalStreaks) * 100) : 0;
+  const isComplete     = lifeScore === 100 && totalStreaks > 0;
+  const pendingStreaks  = streaks.filter(s => !todayCheckIns.has(s.id));
+  const doneStreaks     = streaks.filter(s =>  todayCheckIns.has(s.id));
+
+  // Pagination slices
+  const streakTotalPages  = Math.ceil(streaks.length / PAGE_SIZE);
+  const missionTotalPages = Math.ceil(missions.length / PAGE_SIZE);
+  const streakSlice   = streaks.slice(streakPage * PAGE_SIZE, (streakPage + 1) * PAGE_SIZE);
+  const missionSlice  = missions.slice(missionPage * PAGE_SIZE, (missionPage + 1) * PAGE_SIZE);
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center" style={{ background: "#0d0d0d" }}>
+      <p className="font-mono text-white/20 text-xs tracking-widest animate-pulse">LOADING...</p>
+    </div>
+  );
 
   return (
     <div className="min-h-screen" style={{ background: "#0d0d0d", fontFamily: "'DM Mono', monospace" }}>
@@ -245,142 +248,221 @@ export default function Dashboard() {
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
       `}</style>
 
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        {/* Header */}
-        <div className="mb-6">
-          <div className="flex items-center gap-2 mb-1">
+      <div className="max-w-2xl mx-auto px-6 py-10">
+
+        {/* ── Header — same pattern as all other pages ── */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
               <House size={14} className="text-[#c8f04c]" />
-              <span className="font-mono text-[11px] tracking-widest text-white/30 uppercase">Chalk / Missions</span>
+              <span className="font-mono text-[11px] tracking-widest text-white/30 uppercase">Chalk / Home</span>
+            </div>
+            <h1 className="text-2xl font-mono text-white">Dashboard</h1>
           </div>
-          <h1 className="font-mono text-2xl text-white">Today's Status</h1>
         </div>
 
         {/* Error */}
-        {error && (
+        {pageError && (
           <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 mb-6">
             <AlertTriangle size={13} className="text-red-400 shrink-0" />
-            <span className="font-mono text-xs text-red-400 flex-1">{error}</span>
-            <button onClick={() => setError("")} className="text-red-400/60 hover:text-red-400"><X size={13} /></button>
+            <span className="font-mono text-xs text-red-400 flex-1">{pageError}</span>
+            <button onClick={() => setPageError("")} className="text-red-400/60 hover:text-red-400 cursor-pointer"><X size={13} /></button>
           </div>
         )}
 
-        {/* Grid Layout: Top Cards */}
-        <div className="grid grid-cols-1 gap-4 mb-4">
-          {/* ── Daily Card  ── */}
-          <div
-            className="rounded-2xl border mb-4 overflow-hidden"
-            style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)" }}
-          >
-            {isComplete && <div className="h-0.5 w-full" style={{ background: "#c8f04c" }} />}
-            <div className="px-6 py-6">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <p className="font-mono text-[10px] tracking-widest text-white/30 uppercase mb-1">Life Score</p>
-                  <p className="font-mono text-sm text-white/50">Today</p>
-                </div>
-                {isComplete && (
-                  <div
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
-                    style={{ background: "rgba(200,240,76,0.08)", border: "1px solid rgba(200,240,76,0.2)" }}
-                  >
-                    <Award size={12} style={{ color: "#c8f04c" }} />
-                    <span className="font-mono text-[10px] tracking-widest" style={{ color: "#c8f04c" }}>PERFECT DAY</span>
-                  </div>
-                )}
-              </div>
+        {/* ── Daily Quote ── */}
+        <div
+          className="rounded-2xl border mb-4 px-6 py-5"
+          style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)", borderLeft: "2px solid rgba(200,240,76,0.25)" }}
+        >
+          <p className="font-mono text-sm leading-relaxed mb-3" style={{ color: "rgba(255,255,255,0.55)", fontStyle: "italic" }}>
+            "{dailyQuote.text}"
+          </p>
+          <p className="font-mono text-[10px] tracking-widest" style={{ color: "rgba(200,240,76,0.5)" }}>
+            — {dailyQuote.author}
+          </p>
+        </div>
 
-              <div className="flex items-center gap-8">
-                <LifeScoreRing score={lifeScoreToday} isComplete={isComplete} />
-                <div className="flex-1 space-y-4">
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="font-mono text-[10px] tracking-widest text-white/30 uppercase">Daily Check-In Progress</span>
-                      <span className="font-mono text-[10px] text-white/40">{checkedInToday}/{totalStreaks} streaks</span>
-                    </div>
-                    <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
-                      <div className="h-full rounded-full" style={{ width: `${lifeScoreToday}%`, background: "#c8f04c" }} />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                      <p className="font-mono text-[9px] tracking-widest text-white/25 uppercase mb-1">Total</p>
-                      <p className="font-mono text-xl text-white">{totalStreaks}</p>
-                    </div>
-                    <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                      <p className="font-mono text-[9px] tracking-widest text-white/25 uppercase mb-1">Checked In</p>
-                      <p className="font-mono text-xl" style={{ color: "#c8f04c" }}>{perfectCount}</p>
-                    </div>
-                  </div>
-                  {!isComplete && totalStreaks > 0 && (
-                    <p className="font-mono text-[10px] text-white/20 leading-relaxed">
-                      Check in all streaks today to reach 100% and earn a Perfect Day.
-                    </p>
-                  )}
-                </div>
+        {/* ── Life Score Card ── */}
+        <div
+          className="rounded-2xl border mb-4 overflow-hidden"
+          style={{ background: "#111", borderColor: isComplete ? "rgba(200,240,76,0.25)" : "rgba(255,255,255,0.08)" }}
+        >
+          {isComplete && <div className="h-0.5 w-full" style={{ background: "#c8f04c" }} />}
+          <div className="px-6 py-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <p className="font-mono text-[10px] tracking-widest text-white/30 uppercase mb-1">Today's Life Score</p>
+                <p className="font-mono text-sm text-white/50">{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
               </div>
-            </div>
-          </div>
-
-        {/* Grid Layout: Bottom Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Streak Check-Ins */}
-          <div
-            className="rounded-2xl border p-5"
-            style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)" }}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <p className="font-mono text-[10px] tracking-widest text-white/30 uppercase">Daily Check-Ins</p>
-              <span className="font-mono text-[10px] text-white/40">{checkedInToday}/{totalStreaks}</span>
-            </div>
-            <div className="space-y-2">
-              {streaks.length > 0 ? (
-                streaks.map((streak) => (
-                  <StreakCheckIn key={streak.id} streak={streak} checkedInToday={todayCheckIns.has(streak.id)} />
-                ))
-              ) : (
-                <p className="font-mono text-xs text-white/30 py-8 text-center">No streaks yet. Create one to get started.</p>
+              {isComplete && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ background: "rgba(200,240,76,0.08)", border: "1px solid rgba(200,240,76,0.2)" }}>
+                  <Award size={12} style={{ color: "#c8f04c" }} />
+                  <span className="font-mono text-[10px] tracking-widest" style={{ color: "#c8f04c" }}>PERFECT DAY</span>
+                </div>
               )}
             </div>
-          </div>
 
-          {/* Mission Progress Snapshot */}
-          <div
-            className="rounded-2xl border p-5"
-            style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)" }}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <p className="font-mono text-[10px] tracking-widest text-white/30 uppercase">Mission Progress</p>
-              <Target size={12} className="text-white/30" />
-            </div>
-            {topMissions.length > 0 ? (
-              <div className="space-y-1">
-                {topMissions.map((mission) => (
-                  <MissionSnapshot key={mission.id} mission={mission} />
-                ))}
+            <div className="flex items-center gap-8">
+              <LifeScoreRing score={lifeScore} isComplete={isComplete} />
+              <div className="flex-1 space-y-4">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-mono text-[10px] tracking-widest text-white/30 uppercase">Streaks checked in</span>
+                    <span className="font-mono text-[10px] text-white/40">{checkedInCount}/{totalStreaks}</span>
+                  </div>
+                  <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${lifeScore}%`, background: "#c8f04c" }} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                    <p className="font-mono text-[9px] tracking-widest text-white/25 uppercase mb-1">Pending</p>
+                    <p className="font-mono text-xl text-white">{pendingStreaks.length}</p>
+                  </div>
+                  <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                    <p className="font-mono text-[9px] tracking-widest text-white/25 uppercase mb-1">Done</p>
+                    <p className="font-mono text-xl" style={{ color: "#c8f04c" }}>{doneStreaks.length}</p>
+                  </div>
+                </div>
               </div>
-            ) : (
-              <p className="font-mono text-xs text-white/30 py-8 text-center">No missions yet. Create one to get started.</p>
-            )}
-          </div>
-
-          {/* ── Daily Quote ── */}
-          <div
-            className="rounded-2xl border mb-4 px-6 py-5"
-            style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)", borderLeft: "2px solid rgba(200,240,76,0.25)" }}
-          >
-            <p
-              className="font-mono text-sm leading-relaxed mb-3"
-              style={{ color: "rgba(255,255,255,0.40)", fontStyle: "italic" }}
-            >
-              "{dailyQuote.text}"
-            </p>
-            <p className="font-mono text-[10px] tracking-widest" style={{ color: "rgba(255,255,255,0.30)" }}>
-              — {dailyQuote.author}
-            </p>
+            </div>
           </div>
         </div>
+
+        {/* ── Today's Streaks ── */}
+        {totalStreaks > 0 && (
+          <div className="rounded-2xl border mb-4 overflow-hidden" style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)" }}>
+            <div className="px-5 py-4 border-b border-white/6 flex items-center justify-between">
+              <p className="font-mono text-[10px] tracking-widest text-white/30 uppercase">Today's Streaks</p>
+              <div className="flex items-center gap-1.5">
+                <Flame size={10} className="text-white/20" />
+                <span className="font-mono text-[10px] text-white/20">{checkedInCount}/{totalStreaks}</span>
+              </div>
+            </div>
+            <div className="px-5 py-2" style={{ minHeight: PAGE_SIZE * 57 }}>
+              {streakSlice.map((streak) => {
+                const done      = todayCheckIns.has(streak.id);
+                const spinning  = checkingIn === streak.id;
+                return (
+                  <div key={streak.id} className="flex items-center gap-3 py-2.5 border-b border-white/4 last:border-none">
+                    <Flame size={10} style={{ color: getFlameColor(streak.current_streak ?? 0), flexShrink: 0 }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-mono text-xs truncate" style={{ color: done ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.8)" }}>
+                        {streak.name}
+                      </p>
+                      <p className="font-mono text-[10px] text-white/25">{streak.current_streak ?? 0} day streak</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {/* Shield pips */}
+                      <div className="flex items-center gap-0.5">
+                        {Array.from({ length: 3 }).map((_, i) => (
+                          <Shield key={i} size={9} style={{
+                            color: i < (streak.shields ?? 0) ? "#60a5fa" : "rgba(255,255,255,0.1)",
+                            fill:  i < (streak.shields ?? 0) ? "rgba(96,165,250,0.2)" : "none",
+                          }} />
+                        ))}
+                      </div>
+                      {/* Check-in button */}
+                      <button
+                        onClick={() => handleCheckIn(streak.id)}
+                        disabled={done || !!checkingIn}
+                        className="w-7 h-7 rounded-lg border flex items-center justify-center transition-all"
+                        style={{
+                          background:   done ? "rgba(200,240,76,0.12)" : "rgba(255,255,255,0.06)",
+                          borderColor:  done ? "rgba(200,240,76,0.4)"  : "rgba(255,255,255,0.1)",
+                          cursor:       done ? "default" : checkingIn ? "wait" : "pointer",
+                        }}
+                      >
+                        {spinning ? (
+                          <Loader2 size={11} className="animate-spin" style={{ color: "#c8f04c" }} />
+                        ) : done ? (
+                          <CheckCircle2 size={12} style={{ color: "#c8f04c" }} />
+                        ) : (
+                          <Check size={11} className="text-white/30" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <Pagination page={streakPage} totalPages={streakTotalPages} onChange={setStreakPage} />
+          </div>
+        )}
+
+        {/* ── Mission Progress ── */}
+        {missions.length > 0 && (
+          <div className="rounded-2xl border mb-4 overflow-hidden" style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)" }}>
+            <div className="px-5 py-4 border-b border-white/6 flex items-center justify-between">
+              <p className="font-mono text-[10px] tracking-widest text-white/30 uppercase">Mission Progress</p>
+              <Target size={11} className="text-white/20" />
+            </div>
+            <div className="px-5 py-2" style={{ minHeight: PAGE_SIZE * 57 }}>
+              {missionSlice.map((mission) => {
+                const progress = Math.round(mission.progress ?? 0);
+                const color    = getPriorityColor(mission.priority);
+                const total    = mission.milestones?.length ?? 0;
+                const done     = mission.milestones?.filter(m => m.completed).length ?? 0;
+                return (
+                  <div key={mission.id} className="py-3 border-b border-white/4 last:border-none">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-1 h-3.5 rounded shrink-0" style={{ background: color }} />
+                      <span className="font-mono text-xs text-white truncate flex-1">{mission.title}</span>
+                      <span className="font-mono text-[10px] shrink-0" style={{ color }}>{progress}%</span>
+                      <span className="font-mono text-[9px] text-white/20 shrink-0">{done}/{total}</span>
+                    </div>
+                    <div className="h-1 rounded-full overflow-hidden ml-3" style={{ background: "rgba(255,255,255,0.06)" }}>
+                      <div className="h-full rounded-full transition-all duration-700" style={{ width: `${progress}%`, background: color }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <Pagination page={missionPage} totalPages={missionTotalPages} onChange={setMissionPage} />
+          </div>
+        )}
+
+        {/* ── Recent Journals ── */}
+        {journals.length > 0 && (
+          <div className="rounded-2xl border mb-4 overflow-hidden" style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)" }}>
+            <div className="px-5 py-4 border-b border-white/6 flex items-center justify-between">
+              <p className="font-mono text-[10px] tracking-widest text-white/30 uppercase">Recent Journals</p>
+              <BookOpen size={11} className="text-white/20" />
+            </div>
+            <div className="px-5 py-2">
+              {journals.map((journal) => {
+                const hasTitle = journal.title?.trim().length > 0;
+                return (
+                  <div key={journal.id} className="flex items-center gap-3 py-3 border-b border-white/4 last:border-none">
+                    <div className="w-0.5 self-stretch rounded-full shrink-0" style={{ background: "rgba(200,240,76,0.2)" }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-mono text-xs text-white truncate">
+                        {hasTitle ? journal.title : <span className="text-white/30 italic">Untitled</span>}
+                      </p>
+                      <p className="font-mono text-[10px] text-white/25 mt-0.5">
+                        {formatDate(journal.updated_at)} · {formatTime(journal.updated_at)}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Empty state — nothing created yet */}
+        {totalStreaks === 0 && missions.length === 0 && journals.length === 0 && (
+          <div className="text-center py-24">
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5 border border-white/8" style={{ background: "#111" }}>
+              <House size={22} className="text-white/20" />
+            </div>
+            <p className="font-mono text-white/15 text-[10px] tracking-widest uppercase mb-3">Nothing here yet</p>
+            <p className="font-mono text-white/30 text-sm">Start by creating a streak, mission, or journal entry.</p>
+          </div>
+        )}
+
       </div>
-    </div>
     </div>
   );
 }

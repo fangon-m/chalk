@@ -485,7 +485,7 @@ function StreakModal({ streak, onClose, onSave }) {
           <h2 className="font-mono text-sm tracking-widest text-white/80 uppercase">
             {isEdit ? "Edit Streak" : "New Streak"}
           </h2>
-          <button onClick={onClose} className="text-white/30 hover:text-white/70 transition-colors">
+          <button onClick={onClose} className="text-white/30 hover:text-white/70 transition-colors cursor-pointer">
             <X size={16} />
           </button>
         </div>
@@ -524,14 +524,14 @@ function StreakModal({ streak, onClose, onSave }) {
         <div className="px-6 py-4 border-t border-white/8 flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-lg border border-white/10 text-white/40 font-mono text-xs tracking-widest hover:text-white/60 transition-colors"
+            className="px-4 py-2 rounded-lg border border-white/10 text-white/40 font-mono text-xs tracking-widest hover:text-white/60 transition-colors cursor-pointer"
           >
             CANCEL
           </button>
           <button
             onClick={handleSubmit}
             disabled={saving || !form.name.trim()}
-            className="px-5 py-2 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-5 py-2 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
             style={{ background: form.name.trim() ? "#c8f04c" : "#444", color: "#0d0d0d" }}
           >
             {saving && <Loader2 size={12} className="animate-spin" />}
