@@ -2,22 +2,47 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Flame, Plus, Shield, CheckCircle2, Check, Pencil, Trash2,
   ChevronDown, ChevronUp, X, Loader2, AlertTriangle, Zap,
-  Target, Link2,
+  Target, Link2, CalendarDays,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import {
   getStreaks, createStreak, updateStreak, deleteStreak,
   checkInStreak, getStreakLogs,
 } from "../lib/streaks";
-
 import { recalculateMissionProgress } from "../lib/missions";
 import { getMissionIdsForStreak } from "../lib/streaks";
 
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const DAYS = [
+  { label: "Su", full: "Sunday",    value: 0 },
+  { label: "Mo", full: "Monday",    value: 1 },
+  { label: "Tu", full: "Tuesday",   value: 2 },
+  { label: "We", full: "Wednesday", value: 3 },
+  { label: "Th", full: "Thursday",  value: 4 },
+  { label: "Fr", full: "Friday",    value: 5 },
+  { label: "Sa", full: "Saturday",  value: 6 },
+];
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function isCheckedInToday(logs = []) {
-  const today = new Date().toISOString().slice(0, 10);
-  return logs.some((log) => log.date === today);
+function getTodayDow() {
+  return new Date().getDay(); // 0=Sun … 6=Sat
+}
+
+function isScheduledToday(scheduledDays) {
+  if (!scheduledDays || scheduledDays.length === 0) return true; // every day
+  return scheduledDays.includes(getTodayDow());
+}
+
+function formatSchedule(scheduledDays) {
+  if (!scheduledDays || scheduledDays.length === 0) return "Every day";
+  if (scheduledDays.length === 7) return "Every day";
+  return scheduledDays
+    .slice()
+    .sort((a, b) => a - b)
+    .map(d => DAYS[d].label)
+    .join(", ");
 }
 
 function buildCalendarDots(logs = [], days = 28) {
@@ -32,17 +57,13 @@ function buildCalendarDots(logs = [], days = 28) {
   return result;
 }
 
-// ── Flame color ───────────────────────────────────────────────────────────────
-
 function getFlameColor(count) {
-  if (count >= 50) return "#c8f04c";  // lime — legendary
-  if (count >= 21) return "#ef4444";  // red
-  if (count >= 11) return "#f97316";  // orange
-  if (count >= 3)  return "#eab308";  // yellow
-  return "#6b7280";                   // gray — 0–2
+  if (count >= 50) return "#c8f04c";
+  if (count >= 21) return "#ef4444";
+  if (count >= 11) return "#f97316";
+  if (count >= 3)  return "#eab308";
+  return "#6b7280";
 }
-
-// ── Priority color ────────────────────────────────────────────────────────────
 
 function getPriorityColor(priority) {
   switch (priority) {
@@ -52,6 +73,55 @@ function getPriorityColor(priority) {
     case "low":      return "#6b7280";
     default:         return "#c8f04c";
   }
+}
+
+// ── Day Picker ────────────────────────────────────────────────────────────────
+
+function DayPicker({ value, onChange }) {
+  // value: number[] | null — null/empty means every day
+  const selected = value || [];
+
+  function toggle(dow) {
+    if (selected.includes(dow)) {
+      const next = selected.filter(d => d !== dow);
+      onChange(next.length === 0 ? null : next);
+    } else {
+      onChange([...selected, dow]);
+    }
+  }
+
+  return (
+    <div>
+      <label className="block font-mono text-[10px] tracking-widest text-white/40 uppercase mb-2">
+        Schedule <span className="text-white/20 normal-case tracking-normal ml-1">(empty = every day)</span>
+      </label>
+      <div className="flex gap-1.5">
+        {DAYS.map((day) => {
+          const active = selected.includes(day.value);
+          return (
+            <button
+              key={day.value}
+              type="button"
+              onClick={() => toggle(day.value)}
+              className="flex-1 py-1.5 rounded-lg font-mono text-[10px] tracking-wide transition-all cursor-pointer"
+              style={{
+                background: active ? "rgba(200,240,76,0.15)" : "rgba(255,255,255,0.05)",
+                border: active ? "1px solid rgba(200,240,76,0.35)" : "1px solid rgba(255,255,255,0.08)",
+                color: active ? "#c8f04c" : "rgba(255,255,255,0.3)",
+              }}
+            >
+              {day.label}
+            </button>
+          );
+        })}
+      </div>
+      {selected.length > 0 && (
+        <p className="font-mono text-[10px] text-white/25 mt-1.5">
+          Scheduled: {formatSchedule(selected)}
+        </p>
+      )}
+    </div>
+  );
 }
 
 // ── Calendar strip ────────────────────────────────────────────────────────────
@@ -90,20 +160,16 @@ function ShieldPips({ count = 0, max = 3 }) {
   return (
     <div className="flex items-center gap-0.5">
       {Array.from({ length: max }).map((_, i) => (
-        <Shield
-          key={i}
-          size={12}
-          style={{
-            color: i < count ? "#60a5fa" : "rgba(255,255,255,0.18)",
-            fill: i < count ? "rgba(96,165,250,0.2)" : "none",
-          }}
-        />
+        <Shield key={i} size={12} style={{
+          color: i < count ? "#60a5fa" : "rgba(255,255,255,0.18)",
+          fill:  i < count ? "rgba(96,165,250,0.2)" : "none",
+        }} />
       ))}
     </div>
   );
 }
 
-// ── Connected Missions Panel ──────────────────────────────────────────────────
+// ── Connected Missions ────────────────────────────────────────────────────────
 
 function ConnectedMissions({ streakId }) {
   const [missions, setMissions] = useState(null);
@@ -115,40 +181,21 @@ function ConnectedMissions({ streakId }) {
       try {
         const { data, error } = await supabase
           .from("milestone_streaks")
-          .select(`
-            milestone_id,
-            milestones (
-              id,
-              title,
-              missions (
-                id,
-                title,
-                priority,
-                progress
-              )
-            )
-          `)
+          .select(`milestone_id, milestones(id, title, missions(id, title, priority, progress))`)
           .eq("streak_id", streakId);
-
         if (error) throw error;
 
-        // Deduplicate missions (a streak can connect to multiple milestones
-        // of the same mission)
         const missionMap = new Map();
         for (const row of data || []) {
           const m = row.milestones?.missions;
           const milestone = row.milestones;
           if (!m || !milestone) continue;
           if (!missionMap.has(m.id)) {
-            missionMap.set(m.id, {
-              ...m,
-              milestones: [milestone.title],
-            });
+            missionMap.set(m.id, { ...m, milestones: [milestone.title] });
           } else {
             missionMap.get(m.id).milestones.push(milestone.title);
           }
         }
-
         setMissions([...missionMap.values()]);
       } catch {
         setMissions([]);
@@ -156,29 +203,22 @@ function ConnectedMissions({ streakId }) {
         setLoading(false);
       }
     }
-
     fetchConnected();
   }, [streakId]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center gap-2 text-white/20 pt-1">
-        <Loader2 size={11} className="animate-spin" />
-        <span className="font-mono text-[10px]">Loading...</span>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="flex items-center gap-2 text-white/20 pt-1">
+      <Loader2 size={11} className="animate-spin" />
+      <span className="font-mono text-[10px]">Loading...</span>
+    </div>
+  );
 
-  if (!missions || missions.length === 0) {
-    return (
-      <div className="flex items-center gap-2 pt-1">
-        <Link2 size={11} className="text-white/15" />
-        <span className="font-mono text-[10px] text-white/20 italic">
-          Not linked to any mission
-        </span>
-      </div>
-    );
-  }
+  if (!missions || missions.length === 0) return (
+    <div className="flex items-center gap-2 pt-1">
+      <Link2 size={11} className="text-white/15" />
+      <span className="font-mono text-[10px] text-white/20 italic">Not linked to any mission</span>
+    </div>
+  );
 
   return (
     <div className="flex flex-col gap-2 pt-1">
@@ -186,42 +226,17 @@ function ConnectedMissions({ streakId }) {
         const color = getPriorityColor(mission.priority);
         const progress = mission.progress ?? 0;
         return (
-          <div
-            key={mission.id}
-            className="flex items-center gap-2.5 rounded-lg overflow-hidden"
-            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
-          >
-            {/* Priority stripe */}
-            <div
-              className="w-0.5 self-stretch shrink-0"
-              style={{ background: color, minHeight: 36 }}
-            />
-
+          <div key={mission.id} className="flex items-center gap-2.5 rounded-lg overflow-hidden"
+            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+            <div className="w-0.5 self-stretch shrink-0" style={{ background: color, minHeight: 36 }} />
             <div className="flex-1 min-w-0 py-2 pr-1">
-              <div
-                className="font-mono text-[11px] truncate"
-                style={{ color: "rgba(255,255,255,0.7)" }}
-              >
-                {mission.title}
-              </div>
-              <div className="font-mono text-[9px] text-white/25 truncate mt-0.5">
-                {mission.milestones.join(", ")}
-              </div>
+              <div className="font-mono text-[11px] truncate" style={{ color: "rgba(255,255,255,0.7)" }}>{mission.title}</div>
+              <div className="font-mono text-[9px] text-white/25 truncate mt-0.5">{mission.milestones.join(", ")}</div>
             </div>
-
-            {/* Progress */}
             <div className="flex flex-col items-end gap-1 pr-2.5 py-2 shrink-0">
-              <span className="font-mono text-[10px]" style={{ color }}>
-                {Math.round(progress)}%
-              </span>
-              <div
-                className="w-12 h-0.5 rounded-full overflow-hidden"
-                style={{ background: "rgba(255,255,255,0.08)" }}
-              >
-                <div
-                  className="h-full rounded-full"
-                  style={{ width: `${progress}%`, background: color }}
-                />
+              <span className="font-mono text-[10px]" style={{ color }}>{Math.round(progress)}%</span>
+              <div className="w-12 h-0.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+                <div className="h-full rounded-full" style={{ width: `${progress}%`, background: color }} />
               </div>
             </div>
           </div>
@@ -235,29 +250,13 @@ function ConnectedMissions({ streakId }) {
 
 function ConfirmModal({ message, onConfirm, onCancel }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
-    >
-      <div
-        className="rounded-2xl border border-white/10 p-6 w-80"
-        style={{ background: "#111" }}
-      >
+    <div className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
+      <div className="rounded-2xl border border-white/10 p-6 w-80" style={{ background: "#111" }}>
         <p className="font-mono text-sm text-white/70 mb-6">{message}</p>
         <div className="flex justify-end gap-3">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 rounded-lg border border-white/10 text-white/40 font-mono text-xs tracking-widest hover:text-white/60 transition-colors"
-          >
-            CANCEL
-          </button>
-          <button
-            onClick={onConfirm}
-            className="px-4 py-2 rounded-lg font-mono text-xs tracking-widest transition-all"
-            style={{ background: "#ef4444", color: "white" }}
-          >
-            DELETE
-          </button>
+          <button onClick={onCancel} className="px-4 py-2 rounded-lg border border-white/10 text-white/40 font-mono text-xs tracking-widest hover:text-white/60 transition-colors cursor-pointer">CANCEL</button>
+          <button onClick={onConfirm} className="px-4 py-2 rounded-lg font-mono text-xs tracking-widest transition-all cursor-pointer" style={{ background: "#ef4444", color: "white" }}>DELETE</button>
         </div>
       </div>
     </div>
@@ -271,8 +270,10 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
   const [logs, setLogs] = useState(null);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const checkedToday = streak._checkedToday ?? false;
-  const accentColor = streak.color || "#c8f04c";
+
+  const checkedToday  = streak._checkedToday ?? false;
+  const scheduledToday = isScheduledToday(streak.scheduled_days);
+  const accentColor   = scheduledToday ? (streak.color || "#c8f04c") : "#6b7280";
 
   async function handleExpand() {
     const next = !expanded;
@@ -282,24 +283,17 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
       try {
         const data = await getStreakLogs(streak.id);
         setLogs(data || []);
-      } catch {
-        setLogs([]);
-      } finally {
-        setLoadingLogs(false);
-      }
+      } catch { setLogs([]); }
+      finally { setLoadingLogs(false); }
     }
   }
 
   return (
     <div
       className="group relative rounded-2xl border border-white/8 transition-all duration-200 overflow-hidden hover:border-white/20"
-      style={{ background: "#111" }}
+      style={{ background: "#111", opacity: scheduledToday ? 1 : 0.5 }}
     >
-      {/* Accent stripe */}
-      <div
-        className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-2xl"
-        style={{ background: accentColor }}
-      />
+      <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-2xl" style={{ background: accentColor }} />
 
       <div className="px-5 py-4 pl-6">
         {/* Top row */}
@@ -307,13 +301,13 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
           <div className="flex items-start gap-3 flex-1 min-w-0">
             {/* Check-in button */}
             <button
-              onClick={() => !checkedToday && onCheckIn(streak.id)}
-              disabled={checkedToday || checkingIn === streak.id}
+              onClick={() => scheduledToday && !checkedToday && onCheckIn(streak.id)}
+              disabled={!scheduledToday || checkedToday || checkingIn === streak.id}
               className="shrink-0 w-8 h-8 rounded-lg border flex items-center justify-center transition-all"
               style={{
                 background: checkedToday ? `${accentColor}22` : "rgba(255,255,255,0.08)",
                 borderColor: checkedToday ? accentColor : "rgba(255,255,255,0.1)",
-                cursor: checkedToday ? "default" : "pointer",
+                cursor: (!scheduledToday || checkedToday) ? "default" : "pointer",
               }}
             >
               {checkingIn === streak.id ? (
@@ -321,7 +315,7 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
               ) : checkedToday ? (
                 <CheckCircle2 size={14} style={{ color: accentColor }} />
               ) : (
-                <Check size={13} className="text-white/35" />
+                <Check size={13} style={{ color: scheduledToday ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.15)" }} />
               )}
             </button>
 
@@ -329,38 +323,42 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                 <h3 className="font-mono text-sm text-white">{streak.name}</h3>
-                {checkedToday && (
-                  <span
-                    className="text-[9px] font-mono tracking-widest border px-1.5 py-0.5 rounded"
-                    style={{
-                      color: accentColor,
-                      borderColor: `${accentColor}40`,
-                      background: `${accentColor}10`,
-                    }}
-                  >
+                {checkedToday && scheduledToday && (
+                  <span className="text-[9px] font-mono tracking-widest border px-1.5 py-0.5 rounded"
+                    style={{ color: accentColor, borderColor: `${accentColor}40`, background: `${accentColor}10` }}>
                     DONE
                   </span>
                 )}
+                {!scheduledToday && (
+                  <span className="text-[9px] font-mono tracking-widest border px-1.5 py-0.5 rounded"
+                    style={{ color: "rgba(255,255,255,0.2)", borderColor: "rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)" }}>
+                    OFF TODAY
+                  </span>
+                )}
               </div>
-              {streak.description && (
-                <p className="text-white/30 text-xs font-mono truncate">{streak.description}</p>
-              )}
+              <div className="flex items-center gap-2 flex-wrap">
+                {streak.description && (
+                  <p className="text-white/30 text-xs font-mono truncate">{streak.description}</p>
+                )}
+                {/* Schedule badge */}
+                {streak.scheduled_days && streak.scheduled_days.length > 0 && (
+                  <div className="flex items-center gap-1">
+                    <CalendarDays size={9} className="text-white/20" />
+                    <span className="font-mono text-[9px] text-white/20">{formatSchedule(streak.scheduled_days)}</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Actions */}
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
-            
-            <button
-              onClick={(e) => { e.stopPropagation(); onEdit(streak); }}
-              className="p-1.5 rounded-lg hover:bg-white/8 text-white/30 hover:text-white/70 transition-all cursor-pointer"
-            >
+            <button onClick={(e) => { e.stopPropagation(); onEdit(streak); }}
+              className="p-1.5 rounded-lg hover:bg-white/8 text-white/30 hover:text-white/70 transition-all cursor-pointer">
               <Pencil size={12} />
             </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowConfirm(true); }}
-              className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/30 hover:text-red-400 transition-all cursor-pointer"
-            >
+            <button onClick={(e) => { e.stopPropagation(); setShowConfirm(true); }}
+              className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/30 hover:text-red-400 transition-all cursor-pointer">
               <Trash2 size={12} />
             </button>
           </div>
@@ -371,9 +369,7 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1 text-white/25">
               <Flame size={11} style={{ color: getFlameColor(streak.current_streak ?? 0) }} />
-              <span className="font-mono text-[10px]">
-                {streak.current_streak ?? 0} day{streak.current_streak !== 1 ? "s" : ""}
-              </span>
+              <span className="font-mono text-[10px]">{streak.current_streak ?? 0} day{streak.current_streak !== 1 ? "s" : ""}</span>
             </div>
             <div className="flex items-center gap-1 text-white/25">
               <Zap size={10} />
@@ -381,17 +377,13 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
             </div>
             <ShieldPips count={streak.shields ?? 0} />
           </div>
-
-          {/* Expand toggle (always visible) */}
-          <button
-            onClick={handleExpand}
-            className="flex items-center gap-1 font-mono text-[10px] tracking-widest text-white/35 hover:text-[#c8f04c] transition-colors cursor-pointer"
-          >
+          <button onClick={handleExpand}
+            className="flex items-center gap-1 font-mono text-[10px] tracking-widest text-white/35 hover:text-[#c8f04c] transition-colors cursor-pointer">
             {expanded ? "HIDE" : "HISTORY"} {expanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
           </button>
         </div>
 
-        {/* ── Expanded panel ── */}
+        {/* Expanded panel */}
         {expanded && (
           <div className="mt-3 pt-3 border-t border-white/8">
             {loadingLogs ? (
@@ -401,27 +393,15 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
               </div>
             ) : (
               <div className="flex gap-5">
-                {/* Left: 28-day calendar */}
                 <div className="shrink-0">
-                  <span className="font-mono text-[10px] tracking-widest text-white/25 uppercase">
-                    Last 28 Days
-                  </span>
+                  <span className="font-mono text-[10px] tracking-widest text-white/25 uppercase">Last 28 Days</span>
                   <CalendarStrip logs={logs || []} />
                 </div>
-
-                {/* Divider */}
-                <div
-                  className="w-px self-stretch shrink-0"
-                  style={{ background: "rgba(255,255,255,0.06)" }}
-                />
-
-                {/* Right: connected missions */}
+                <div className="w-px self-stretch shrink-0" style={{ background: "rgba(255,255,255,0.06)" }} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 mb-1">
                     <Target size={10} className="text-white/25" />
-                    <span className="font-mono text-[10px] tracking-widest text-white/25 uppercase">
-                      Connected Missions
-                    </span>
+                    <span className="font-mono text-[10px] tracking-widest text-white/25 uppercase">Connected Missions</span>
                   </div>
                   <ConnectedMissions streakId={streak.id} />
                 </div>
@@ -447,21 +427,27 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
 function StreakModal({ streak, onClose, onSave }) {
   const isEdit = !!streak?.id;
   const [form, setForm] = useState({
-    name: streak?.name || "",
-    description: streak?.description || "",
+    name:           streak?.name          || "",
+    description:    streak?.description   || "",
+    scheduled_days: streak?.scheduled_days || null,
   });
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [error,  setError]  = useState("");
 
   async function handleSubmit() {
     if (!form.name.trim()) return setError("Name is required");
     setSaving(true);
     setError("");
     try {
+      const payload = {
+        name:           form.name.trim(),
+        description:    form.description.trim() || null,
+        scheduled_days: form.scheduled_days?.length > 0 ? form.scheduled_days : null,
+      };
       if (isEdit) {
-        await updateStreak(streak.id, { name: form.name.trim(), description: form.description.trim() });
+        await updateStreak(streak.id, payload);
       } else {
-        await createStreak({ name: form.name.trim(), description: form.description.trim() });
+        await createStreak(payload);
       }
       onSave();
     } catch (e) {
@@ -472,31 +458,22 @@ function StreakModal({ streak, onClose, onSave }) {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)" }}
-    >
-      <div
-        className="relative w-full max-w-lg mx-4 rounded-2xl border border-white/10 overflow-hidden"
-        style={{ background: "#111" }}
-      >
+    <div className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)" }}>
+      <div className="relative w-full max-w-lg mx-4 rounded-2xl border border-white/10 overflow-hidden" style={{ background: "#111" }}>
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-white/8">
           <h2 className="font-mono text-sm tracking-widest text-white/80 uppercase">
             {isEdit ? "Edit Streak" : "New Streak"}
           </h2>
-          <button onClick={onClose} className="text-white/30 hover:text-white/70 transition-colors cursor-pointer">
-            <X size={16} />
-          </button>
+          <button onClick={onClose} className="text-white/30 hover:text-white/70 transition-colors cursor-pointer"><X size={16} /></button>
         </div>
 
         {/* Body */}
         <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
           {/* Name */}
           <div>
-            <label className="block font-mono text-[10px] tracking-widest text-white/40 uppercase mb-1.5">
-              Streak Name
-            </label>
+            <label className="block font-mono text-[10px] tracking-widest text-white/40 uppercase mb-1.5">Streak Name</label>
             <input
               value={form.name}
               onChange={(e) => { setForm({ ...form, name: e.target.value }); setError(""); }}
@@ -508,9 +485,7 @@ function StreakModal({ streak, onClose, onSave }) {
 
           {/* Description */}
           <div>
-            <label className="block font-mono text-[10px] tracking-widest text-white/40 uppercase mb-1.5">
-              Description
-            </label>
+            <label className="block font-mono text-[10px] tracking-widest text-white/40 uppercase mb-1.5">Description</label>
             <input
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -518,14 +493,18 @@ function StreakModal({ streak, onClose, onSave }) {
               className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors"
             />
           </div>
+
+          {/* Schedule */}
+          <DayPicker
+            value={form.scheduled_days}
+            onChange={(v) => setForm({ ...form, scheduled_days: v })}
+          />
         </div>
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-white/8 flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg border border-white/10 text-white/40 font-mono text-xs tracking-widest hover:text-white/60 transition-colors cursor-pointer"
-          >
+          <button onClick={onClose}
+            className="px-4 py-2 rounded-lg border border-white/10 text-white/40 font-mono text-xs tracking-widest hover:text-white/60 transition-colors cursor-pointer">
             CANCEL
           </button>
           <button
@@ -546,72 +525,62 @@ function StreakModal({ streak, onClose, onSave }) {
 // ── Main Streaks Page ─────────────────────────────────────────────────────────
 
 export default function Streaks() {
-  const [streaks, setStreaks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [pageError, setPageError] = useState("");
+  const [streaks, setStreaks]       = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [pageError, setPageError]   = useState("");
   const [checkingIn, setCheckingIn] = useState(null);
-
-  const [showModal, setShowModal] = useState(false);
+  const [showModal, setShowModal]   = useState(false);
   const [editingStreak, setEditingStreak] = useState(null);
-
-  const [tab, setTab] = useState("active"); // "active" | "done"
-  const [todayMap, setTodayMap] = useState({});
+  const [tab, setTab]               = useState("active");
+  const [todayMap, setTodayMap]     = useState({});
 
   const load = useCallback(async () => {
-  setLoading(true);
-  try {
-    // ── Only run handle_missed_streaks once per day ──
-    const today = new Date().toISOString().slice(0, 10);
-    const lastRun = localStorage.getItem("chalk_missed_streaks_date");
-    if (lastRun !== today) {
-      await supabase.rpc("handle_missed_streaks");
-      localStorage.setItem("chalk_missed_streaks_date", today);
+    setLoading(true);
+    try {
+      const today   = new Date().toISOString().slice(0, 10);
+      const lastRun = localStorage.getItem("chalk_missed_streaks_date");
+      if (lastRun !== today) {
+        await supabase.rpc("handle_missed_streaks");
+        localStorage.setItem("chalk_missed_streaks_date", today);
+      }
+
+      const data = await getStreaks();
+      setStreaks(data || []);
+
+      const checks = await Promise.all(
+        (data || []).map((s) =>
+          supabase.from("streak_logs").select("id")
+            .eq("streak_id", s.id).eq("date", today).maybeSingle()
+            .then(({ data: row }) => [s.id, !!row])
+        )
+      );
+      setTodayMap(Object.fromEntries(checks));
+    } catch (e) {
+      setPageError(e.message);
+    } finally {
+      setLoading(false);
     }
-
-    const data = await getStreaks();
-    setStreaks(data || []);
-
-    const checks = await Promise.all(
-      (data || []).map((s) =>
-        supabase
-          .from("streak_logs")
-          .select("id")
-          .eq("streak_id", s.id)
-          .eq("date", today)
-          .maybeSingle()
-          .then(({ data: row }) => [s.id, !!row])
-      )
-    );
-    setTodayMap(Object.fromEntries(checks));
-  } catch (e) {
-    setPageError(e.message);
-  } finally {
-    setLoading(false);
-  }
-}, []);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
   async function handleCheckIn(id) {
-  setCheckingIn(id);
-  try {
-    await checkInStreak(id);
-    setTodayMap((prev) => ({ ...prev, [id]: true }));
-    const fresh = await getStreaks();
-    setStreaks(fresh || []);
-
-    // ── Silently recalculate any connected missions in the background ──
-    const missionIds = await getMissionIdsForStreak(id);
-    if (missionIds.length > 0) {
-      Promise.all(missionIds.map((mid) => recalculateMissionProgress(mid)))
-        .catch(() => {}); // silent — don't block or error the UI
+    setCheckingIn(id);
+    try {
+      await checkInStreak(id);
+      setTodayMap((prev) => ({ ...prev, [id]: true }));
+      const fresh = await getStreaks();
+      setStreaks(fresh || []);
+      const missionIds = await getMissionIdsForStreak(id);
+      if (missionIds.length > 0) {
+        Promise.all(missionIds.map((mid) => recalculateMissionProgress(mid))).catch(() => {});
+      }
+    } catch (e) {
+      setPageError(e.message);
+    } finally {
+      setCheckingIn(null);
     }
-  } catch (e) {
-    setPageError(e.message);
-  } finally {
-    setCheckingIn(null);
   }
-}
 
   async function handleDelete(id) {
     try {
@@ -622,13 +591,19 @@ export default function Streaks() {
     }
   }
 
+  // Enrich streaks with today check-in status
   const enriched = streaks.map((s) => ({ ...s, _checkedToday: !!todayMap[s.id] }));
-  const doneCount = Object.values(todayMap).filter(Boolean).length;
-  const totalCount = streaks.length;
 
-  const filtered = enriched.filter((s) =>
-    tab === "done" ? s._checkedToday : !s._checkedToday
-  );
+  // For tabs: only count streaks that are scheduled today
+  const scheduledToday = enriched.filter(s => isScheduledToday(s.scheduled_days));
+  const doneCount  = scheduledToday.filter(s => s._checkedToday).length;
+  const totalCount = streaks.length;
+  const scheduledCount = scheduledToday.length;
+
+  // Filter by tab — always show all streaks, but grayed out if off today
+  const filtered = tab === "done"
+    ? enriched.filter(s => s._checkedToday)
+    : enriched.filter(s => !s._checkedToday);
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: "#0d0d0d" }}>
@@ -649,29 +624,24 @@ export default function Streaks() {
 
       <div className="max-w-2xl mx-auto px-6 py-10">
 
-        {/* Page Header */}
+        {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Flame size={14} className="text-[#c8f04c]" />
-              <span className="font-mono text-[11px] tracking-widest text-white/30 uppercase">
-                Chalk / Streaks
-              </span>
+              <span className="font-mono text-[11px] tracking-widest text-white/30 uppercase">Chalk / Streaks</span>
             </div>
             <h1 className="text-2xl font-mono text-white">
               Streaks
-              <span className="ml-2 text-sm" style={{ color: "#c8f04c" }}>
-                {totalCount}
-              </span>
+              <span className="ml-2 text-sm" style={{ color: "#c8f04c" }}>{totalCount}</span>
             </h1>
           </div>
           <button
             onClick={() => { setEditingStreak(null); setShowModal(true); }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs tracking-widest transition-all hover:opacity-90 active:scale-95"
-            style={{ background: "#c8f04c", color: "#0d0d0d", fontWeight: "500", cursor: "pointer" }}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs tracking-widest transition-all hover:opacity-90 active:scale-95 cursor-pointer"
+            style={{ background: "#c8f04c", color: "#0d0d0d", fontWeight: "500" }}
           >
-            <Plus size={13} />
-            NEW STREAK
+            <Plus size={13} /> NEW STREAK
           </button>
         </div>
 
@@ -679,64 +649,43 @@ export default function Streaks() {
         {totalCount > 0 && (
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: "#111" }}>
-              <button
-                onClick={() => setTab("active")}
-                className="px-4 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all"
-                style={{
-                  background: tab === "active" ? "#c8f04c" : "transparent",
-                  color: tab === "active" ? "#0d0d0d" : "rgba(255,255,255,0.3)",
-                  cursor: "pointer",
-                }}
-              >
+              <button onClick={() => setTab("active")}
+                className="px-4 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all cursor-pointer"
+                style={{ background: tab === "active" ? "#c8f04c" : "transparent", color: tab === "active" ? "#0d0d0d" : "rgba(255,255,255,0.3)" }}>
                 PENDING
               </button>
-              <button
-                onClick={() => setTab("done")}
-                className="px-4 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all"
-                style={{
-                  background: tab === "done" ? "#c8f04c" : "transparent",
-                  color: tab === "done" ? "#0d0d0d" : "rgba(255,255,255,0.3)",
-                  cursor: "pointer",
-                }}
-              >
+              <button onClick={() => setTab("done")}
+                className="px-4 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all cursor-pointer"
+                style={{ background: tab === "done" ? "#c8f04c" : "transparent", color: tab === "done" ? "#0d0d0d" : "rgba(255,255,255,0.3)" }}>
                 DONE TODAY
               </button>
             </div>
-
-            {/* Daily progress */}
             <div className="font-mono text-[10px] tracking-widest text-white/25">
-              {doneCount} / {totalCount} CHECKED IN
+              {doneCount} / {scheduledCount} CHECKED IN
             </div>
           </div>
         )}
 
-        {/* Error banner */}
+        {/* Error */}
         {pageError && (
           <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 mb-4">
             <AlertTriangle size={13} className="text-red-400 shrink-0" />
             <span className="font-mono text-xs text-red-400 flex-1">{pageError}</span>
-            <button onClick={() => setPageError("")} className="text-red-400/60 hover:text-red-400 transition-colors">
-              <X size={13} />
-            </button>
+            <button onClick={() => setPageError("")} className="text-red-400/60 hover:text-red-400 transition-colors cursor-pointer"><X size={13} /></button>
           </div>
         )}
 
         {/* Streak list */}
         {totalCount === 0 ? (
           <div className="text-center py-24">
-            <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/8"
-              style={{ background: "#111" }}
-            >
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/8" style={{ background: "#111" }}>
               <Flame size={22} className="text-white/20" />
             </div>
             <p className="font-mono text-white/30 text-sm mb-1">No streaks yet</p>
             <p className="font-mono text-white/15 text-xs mb-6">Start building daily habits</p>
-            <button
-              onClick={() => { setEditingStreak(null); setShowModal(true); }}
-              className="px-5 py-2.5 rounded-xl font-mono text-xs tracking-widest"
-              style={{ background: "#c8f04c", color: "#0d0d0d", cursor: "pointer" }}
-            >
+            <button onClick={() => { setEditingStreak(null); setShowModal(true); }}
+              className="px-5 py-2.5 rounded-xl font-mono text-xs tracking-widest cursor-pointer"
+              style={{ background: "#c8f04c", color: "#0d0d0d" }}>
               GET STARTED
             </button>
           </div>
@@ -769,13 +718,12 @@ export default function Streaks() {
           <div className="mt-6 flex items-center gap-2 px-4 py-3 rounded-xl border border-blue-400/15 bg-blue-400/5">
             <Shield size={13} className="text-blue-400 shrink-0" />
             <span className="font-mono text-[10px] text-white/30 tracking-wide">
-              Shields protect your streaks from missed days.
+              Shields only deduct on missed scheduled days.
             </span>
           </div>
         )}
       </div>
 
-      {/* Modal */}
       {showModal && (
         <StreakModal
           streak={editingStreak}
