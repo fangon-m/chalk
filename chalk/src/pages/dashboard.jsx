@@ -422,34 +422,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── Recent Journals ── */}
-        {journals.length > 0 && (
-          <div className="rounded-2xl border mb-4 overflow-hidden" style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)" }}>
-            <div className="px-5 py-4 border-b border-white/6 flex items-center justify-between">
-              <p className="font-mono text-[10px] tracking-widest text-white/30 uppercase">Recent Journals</p>
-              <BookOpen size={11} className="text-white/20" />
-            </div>
-            <div className="px-5 py-2">
-              {journals.map((journal) => {
-                const hasTitle = journal.title?.trim().length > 0;
-                return (
-                  <div key={journal.id} className="flex items-center gap-3 py-3 border-b border-white/4 last:border-none">
-                    <div className="w-0.5 self-stretch rounded-full shrink-0" style={{ background: "rgba(200,240,76,0.2)" }} />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-mono text-xs text-white truncate">
-                        {hasTitle ? journal.title : <span className="text-white/30 italic">Untitled</span>}
-                      </p>
-                      <p className="font-mono text-[10px] text-white/25 mt-0.5">
-                        {formatDate(journal.updated_at)} · {formatTime(journal.updated_at)}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* Empty state — nothing created yet */}
         {totalStreaks === 0 && missions.length === 0 && journals.length === 0 && (
           <div className="text-center py-24">

@@ -93,7 +93,7 @@ function DayPicker({ value, onChange }) {
   return (
     <div>
       <label className="block font-mono text-[10px] tracking-widest text-white/40 uppercase mb-2">
-        Schedule <span className="text-white/20 normal-case tracking-normal ml-1">(empty = every day)</span>
+        Schedule{(!value || value.length === 0) && <span className="text-white/20 normal-case tracking-normal ml-1">(empty = every day)</span>}
       </label>
       <div className="flex gap-1.5">
         {DAYS.map((day) => {
