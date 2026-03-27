@@ -126,28 +126,39 @@ function DayPicker({ value, onChange }) {
 
 // ── Calendar strip ────────────────────────────────────────────────────────────
 
-function CalendarStrip({ logs }) {
+function CalendarStrip({ logs, scheduledDays = null }) {
   const dots = buildCalendarDots(logs, 28);
   const weeks = [];
   for (let i = 0; i < dots.length; i += 7) weeks.push(dots.slice(i, i + 7));
+
+  function isScheduledDay(dateStr) {
+    // If no scheduled days specified, treat as every day
+    if (!scheduledDays || scheduledDays.length === 0) return true;
+    const date = new Date(dateStr);
+    const dayOfWeek = date.getDay();
+    return scheduledDays.includes(dayOfWeek);
+  }
 
   return (
     <div className="flex gap-1 mt-2">
       {weeks.map((week, wi) => (
         <div key={wi} className="flex flex-col gap-1">
-          {week.map((day, di) => (
-            <div
-              key={di}
-              title={day.date}
-              className="w-2.5 h-2.5 rounded-sm"
-              style={{
-                background: day.checked ? "#c8f04c" : "rgba(255,255,255,0.07)",
-                outline: day.isToday ? "1.5px solid #c8f04c" : "none",
-                outlineOffset: 1,
-                opacity: day.checked ? 1 : 0.45,
-              }}
-            />
-          ))}
+          {week.map((day, di) => {
+            const isScheduled = isScheduledDay(day.date);
+            return (
+              <div
+                key={di}
+                title={day.date}
+                className="w-2.5 h-2.5 rounded-sm"
+                style={{
+                  background: day.checked ? "#c8f04c" : isScheduled ? "rgba(120,120,120,0.4)" : "rgba(60,60,60,0.3)",
+                  outline: day.isToday ? "1.5px solid #c8f04c" : "none",
+                  outlineOffset: 1,
+                  opacity: 1,
+                }}
+              />
+            );
+          })}
         </div>
       ))}
     </div>
@@ -395,7 +406,7 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
               <div className="flex gap-5">
                 <div className="shrink-0">
                   <span className="font-mono text-[10px] tracking-widest text-white/25 uppercase">Last 28 Days</span>
-                  <CalendarStrip logs={logs || []} />
+                  <CalendarStrip logs={logs || []} scheduledDays={streak.scheduled_days} />
                 </div>
                 <div className="w-px self-stretch shrink-0" style={{ background: "rgba(255,255,255,0.06)" }} />
                 <div className="flex-1 min-w-0">
