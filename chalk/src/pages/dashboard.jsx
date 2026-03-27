@@ -53,6 +53,13 @@ function getDailyQuote() {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+function getTodayDow() { return new Date().getDay(); }
+
+function isScheduledToday(scheduledDays) {
+  if (!scheduledDays || scheduledDays.length === 0) return true;
+  return scheduledDays.includes(getTodayDow());
+}
+
 function getFlameColor(count) {
   if (count >= 50) return "#c8f04c";
   if (count >= 21) return "#ef4444";
@@ -74,7 +81,6 @@ function getPriorityColor(priority) {
 function formatDate(iso) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
-
 function formatTime(iso) {
   return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
@@ -95,12 +101,8 @@ function LifeScoreRing({ score, isComplete }) {
     <div className="relative flex items-center justify-center" style={{ width: 120, height: 120 }}>
       <svg width="120" height="120" style={{ transform: "rotate(-90deg)" }}>
         <circle cx="60" cy="60" r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="7" />
-        <circle
-          cx="60" cy="60" r={radius}
-          fill="none" stroke={color} strokeWidth="7" strokeLinecap="round"
-          strokeDasharray={`${filled} ${circumference}`}
-          style={{ transition: "stroke-dasharray 1s ease" }}
-        />
+        <circle cx="60" cy="60" r={radius} fill="none" stroke={color} strokeWidth="7" strokeLinecap="round"
+          strokeDasharray={`${filled} ${circumference}`} style={{ transition: "stroke-dasharray 1s ease" }} />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         {isComplete ? (
@@ -122,23 +124,15 @@ function Pagination({ page, totalPages, onChange }) {
   if (totalPages <= 1) return null;
   return (
     <div className="flex items-center justify-between px-5 py-3 border-t border-white/6">
-      <button
-        onClick={() => onChange(page - 1)}
-        disabled={page === 0}
+      <button onClick={() => onChange(page - 1)} disabled={page === 0}
         className="flex items-center gap-1 font-mono text-[10px] tracking-widest transition-colors disabled:opacity-20 cursor-pointer disabled:cursor-default"
-        style={{ color: "rgba(255,255,255,0.35)" }}
-      >
+        style={{ color: "rgba(255,255,255,0.35)" }}>
         <ChevronLeft size={11} /> PREV
       </button>
-      <span className="font-mono text-[10px] text-white/25">
-        {page + 1} / {totalPages}
-      </span>
-      <button
-        onClick={() => onChange(page + 1)}
-        disabled={page === totalPages - 1}
+      <span className="font-mono text-[10px] text-white/25">{page + 1} / {totalPages}</span>
+      <button onClick={() => onChange(page + 1)} disabled={page === totalPages - 1}
         className="flex items-center gap-1 font-mono text-[10px] tracking-widest transition-colors disabled:opacity-20 cursor-pointer disabled:cursor-default"
-        style={{ color: "rgba(255,255,255,0.35)" }}
-      >
+        style={{ color: "rgba(255,255,255,0.35)" }}>
         NEXT <ChevronRight size={11} />
       </button>
     </div>
@@ -148,15 +142,14 @@ function Pagination({ page, totalPages, onChange }) {
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const [loading, setLoading] = useState(true);
-  const [pageError, setPageError] = useState("");
-  const [streaks, setStreaks] = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [pageError, setPageError]     = useState("");
+  const [allStreaks, setAllStreaks]    = useState([]);
   const [todayCheckIns, setTodayCheckIns] = useState(new Set());
-  const [missions, setMissions] = useState([]);
-  const [journals, setJournals] = useState([]);
-  const [checkingIn, setCheckingIn] = useState(null);
+  const [missions, setMissions]       = useState([]);
+  const [journals, setJournals]       = useState([]);
+  const [checkingIn, setCheckingIn]   = useState(null);
 
-  // Pagination
   const PAGE_SIZE = 5;
   const [streakPage, setStreakPage]   = useState(0);
   const [missionPage, setMissionPage] = useState(0);
@@ -169,10 +162,10 @@ export default function Dashboard() {
     setPageError("");
     try {
       const [
-        { data: streakData, error: streakErr },
-        { data: logsData,   error: logsErr   },
-        { data: missionData,error: missionErr},
-        { data: journalData,error: journalErr},
+        { data: streakData,  error: streakErr  },
+        { data: logsData,    error: logsErr    },
+        { data: missionData, error: missionErr },
+        { data: journalData, error: journalErr },
       ] = await Promise.all([
         supabase.from("streaks").select("*").order("created_at", { ascending: true }),
         supabase.from("streak_logs").select("streak_id").eq("date", today),
@@ -180,12 +173,12 @@ export default function Dashboard() {
         supabase.from("journals").select("id, title, created_at, updated_at").is("deleted_at", null).order("updated_at", { ascending: false }).limit(3),
       ]);
 
-      if (streakErr) throw streakErr;
-      if (logsErr)   throw logsErr;
+      if (streakErr)  throw streakErr;
+      if (logsErr)    throw logsErr;
       if (missionErr) throw missionErr;
       if (journalErr) throw journalErr;
 
-      setStreaks(streakData || []);
+      setAllStreaks(streakData || []);
       setTodayCheckIns(new Set((logsData || []).map(l => l.streak_id)));
       setMissions(missionData || []);
       setJournals(journalData || []);
@@ -204,10 +197,8 @@ export default function Dashboard() {
     try {
       await checkInStreak(streakId);
       setTodayCheckIns(prev => new Set([...prev, streakId]));
-      // Refresh streak counts
       const { data } = await supabase.from("streaks").select("*").order("created_at", { ascending: true });
-      if (data) setStreaks(data);
-      // Recalculate connected missions silently
+      if (data) setAllStreaks(data);
       const missionIds = await getMissionIdsForStreak(streakId);
       if (missionIds.length > 0) {
         Promise.all(missionIds.map(mid => recalculateMissionProgress(mid))).catch(() => {});
@@ -219,17 +210,19 @@ export default function Dashboard() {
     }
   }
 
-  const checkedInCount = todayCheckIns.size;
-  const totalStreaks   = streaks.length;
-  const lifeScore      = totalStreaks > 0 ? Math.round((checkedInCount / totalStreaks) * 100) : 0;
-  const isComplete     = lifeScore === 100 && totalStreaks > 0;
-  const pendingStreaks  = streaks.filter(s => !todayCheckIns.has(s.id));
-  const doneStreaks     = streaks.filter(s =>  todayCheckIns.has(s.id));
+  // ── Only show streaks scheduled for today ──
+  const todayStreaks    = allStreaks.filter(s => isScheduledToday(s.scheduled_days));
+  const checkedInCount = todayStreaks.filter(s => todayCheckIns.has(s.id)).length;
+  const totalScheduled = todayStreaks.length;
+  const lifeScore      = totalScheduled > 0 ? Math.round((checkedInCount / totalScheduled) * 100) : 0;
+  const isComplete     = lifeScore === 100 && totalScheduled > 0;
+  const pendingCount   = todayStreaks.filter(s => !todayCheckIns.has(s.id)).length;
+  const doneCount      = checkedInCount;
 
   // Pagination slices
-  const streakTotalPages  = Math.ceil(streaks.length / PAGE_SIZE);
+  const streakTotalPages  = Math.ceil(todayStreaks.length / PAGE_SIZE);
   const missionTotalPages = Math.ceil(missions.length / PAGE_SIZE);
-  const streakSlice   = streaks.slice(streakPage * PAGE_SIZE, (streakPage + 1) * PAGE_SIZE);
+  const streakSlice   = todayStreaks.slice(streakPage * PAGE_SIZE, (streakPage + 1) * PAGE_SIZE);
   const missionSlice  = missions.slice(missionPage * PAGE_SIZE, (missionPage + 1) * PAGE_SIZE);
 
   if (loading) return (
@@ -250,7 +243,7 @@ export default function Dashboard() {
 
       <div className="max-w-2xl mx-auto px-6 py-10">
 
-        {/* ── Header — same pattern as all other pages ── */}
+        {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -270,11 +263,9 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── Daily Quote ── */}
-        <div
-          className="rounded-2xl border mb-4 px-6 py-5"
-          style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)" }}
-        >
+        {/* Daily Quote */}
+        <div className="rounded-2xl border mb-4 px-6 py-5"
+          style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)", borderLeft: "2px solid rgba(200,240,76,0.25)" }}>
           <p className="font-mono text-sm leading-relaxed mb-3" style={{ color: "rgba(255,255,255,0.55)", fontStyle: "italic" }}>
             "{dailyQuote.text}"
           </p>
@@ -283,32 +274,33 @@ export default function Dashboard() {
           </p>
         </div>
 
-        {/* ── Life Score Card ── */}
-        <div
-          className="rounded-2xl border mb-4 overflow-hidden"
-          style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)" }}
-        >
+        {/* Life Score Card */}
+        <div className="rounded-2xl border mb-4 overflow-hidden"
+          style={{ background: "#111", borderColor: isComplete ? "rgba(200,240,76,0.25)" : "rgba(255,255,255,0.08)" }}>
+          {isComplete && <div className="h-0.5 w-full" style={{ background: "#c8f04c" }} />}
           <div className="px-6 py-6">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <p className="font-mono text-[10px] tracking-widest text-white/30 uppercase mb-1">Today's Life Score</p>
-                <p className="font-mono text-sm text-white/50">{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
+                <p className="font-mono text-sm text-white/50">
+                  {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                </p>
               </div>
               {isComplete && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ background: "rgba(200,240,76,0.08)", border: "1px solid rgba(200,240,76,0.2)" }}>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
+                  style={{ background: "rgba(200,240,76,0.08)", border: "1px solid rgba(200,240,76,0.2)" }}>
                   <Award size={12} style={{ color: "#c8f04c" }} />
                   <span className="font-mono text-[10px] tracking-widest" style={{ color: "#c8f04c" }}>PERFECT DAY</span>
                 </div>
               )}
             </div>
-
             <div className="flex items-center gap-8">
               <LifeScoreRing score={lifeScore} isComplete={isComplete} />
               <div className="flex-1 space-y-4">
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="font-mono text-[10px] tracking-widest text-white/30 uppercase">Streaks checked in</span>
-                    <span className="font-mono text-[10px] text-white/40">{checkedInCount}/{totalStreaks}</span>
+                    <span className="font-mono text-[10px] text-white/40">{checkedInCount}/{totalScheduled}</span>
                   </div>
                   <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
                     <div className="h-full rounded-full transition-all duration-700" style={{ width: `${lifeScore}%`, background: "#c8f04c" }} />
@@ -317,43 +309,46 @@ export default function Dashboard() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
                     <p className="font-mono text-[9px] tracking-widest text-white/25 uppercase mb-1">Pending</p>
-                    <p className="font-mono text-xl text-white">{pendingStreaks.length}</p>
+                    <p className="font-mono text-xl text-white">{pendingCount}</p>
                   </div>
                   <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
                     <p className="font-mono text-[9px] tracking-widest text-white/25 uppercase mb-1">Done</p>
-                    <p className="font-mono text-xl" style={{ color: "#c8f04c" }}>{doneStreaks.length}</p>
+                    <p className="font-mono text-xl" style={{ color: "#c8f04c" }}>{doneCount}</p>
                   </div>
                 </div>
+                {totalScheduled === 0 && allStreaks.length > 0 && (
+                  <p className="font-mono text-[10px] text-white/20 leading-relaxed">No streaks scheduled for today.</p>
+                )}
               </div>
             </div>
           </div>
         </div>
 
-        {/* ── Today's Streaks ── */}
-        {totalStreaks > 0 && (
+        {/* Today's Streaks — only scheduled ones */}
+        {totalScheduled > 0 && (
           <div className="rounded-2xl border mb-4 overflow-hidden" style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)" }}>
             <div className="px-5 py-4 border-b border-white/6 flex items-center justify-between">
               <p className="font-mono text-[10px] tracking-widest text-white/30 uppercase">Today's Streaks</p>
               <div className="flex items-center gap-1.5">
                 <Flame size={10} className="text-white/20" />
-                <span className="font-mono text-[10px] text-white/20">{checkedInCount}/{totalStreaks}</span>
+                <span className="font-mono text-[10px] text-white/20">{checkedInCount}/{totalScheduled}</span>
               </div>
             </div>
-            <div className="px-5 py-2" style={{ minHeight: PAGE_SIZE * 57 }}>
+            <div className="px-5 py-2" style={{ minHeight: Math.min(todayStreaks.length, PAGE_SIZE) * 57 }}>
               {streakSlice.map((streak) => {
-                const done      = todayCheckIns.has(streak.id);
-                const spinning  = checkingIn === streak.id;
+                const done     = todayCheckIns.has(streak.id);
+                const spinning = checkingIn === streak.id;
                 return (
                   <div key={streak.id} className="flex items-center gap-3 py-2.5 border-b border-white/4 last:border-none">
                     <Flame size={10} style={{ color: getFlameColor(streak.current_streak ?? 0), flexShrink: 0 }} />
                     <div className="flex-1 min-w-0">
-                      <p className="font-mono text-xs truncate" style={{ color: done ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.8)" }}>
+                      <p className="font-mono text-xs truncate"
+                        style={{ color: done ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.8)" }}>
                         {streak.name}
                       </p>
                       <p className="font-mono text-[10px] text-white/25">{streak.current_streak ?? 0} day streak</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {/* Shield pips */}
                       <div className="flex items-center gap-0.5">
                         {Array.from({ length: 3 }).map((_, i) => (
                           <Shield key={i} size={9} style={{
@@ -362,15 +357,14 @@ export default function Dashboard() {
                           }} />
                         ))}
                       </div>
-                      {/* Check-in button */}
                       <button
                         onClick={() => handleCheckIn(streak.id)}
                         disabled={done || !!checkingIn}
                         className="w-7 h-7 rounded-lg border flex items-center justify-center transition-all"
                         style={{
-                          background:   done ? "rgba(200,240,76,0.12)" : "rgba(255,255,255,0.06)",
-                          borderColor:  done ? "rgba(200,240,76,0.4)"  : "rgba(255,255,255,0.1)",
-                          cursor:       done ? "default" : checkingIn ? "wait" : "pointer",
+                          background:  done ? "rgba(200,240,76,0.12)" : "rgba(255,255,255,0.06)",
+                          borderColor: done ? "rgba(200,240,76,0.4)"  : "rgba(255,255,255,0.1)",
+                          cursor:      done ? "default" : checkingIn ? "wait" : "pointer",
                         }}
                       >
                         {spinning ? (
@@ -390,14 +384,14 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── Mission Progress ── */}
+        {/* Mission Progress */}
         {missions.length > 0 && (
           <div className="rounded-2xl border mb-4 overflow-hidden" style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)" }}>
             <div className="px-5 py-4 border-b border-white/6 flex items-center justify-between">
               <p className="font-mono text-[10px] tracking-widest text-white/30 uppercase">Mission Progress</p>
               <Target size={11} className="text-white/20" />
             </div>
-            <div className="px-5 py-2" style={{ minHeight: PAGE_SIZE * 57 }}>
+            <div className="px-5 py-2" style={{ minHeight: Math.min(missions.length, PAGE_SIZE) * 57 }}>
               {missionSlice.map((mission) => {
                 const progress = Math.round(mission.progress ?? 0);
                 const color    = getPriorityColor(mission.priority);
@@ -412,7 +406,8 @@ export default function Dashboard() {
                       <span className="font-mono text-[9px] text-white/20 shrink-0">{done}/{total}</span>
                     </div>
                     <div className="h-1 rounded-full overflow-hidden ml-3" style={{ background: "rgba(255,255,255,0.06)" }}>
-                      <div className="h-full rounded-full transition-all duration-700" style={{ width: `${progress}%`, background: color }} />
+                      <div className="h-full rounded-full transition-all duration-700"
+                        style={{ width: `${progress}%`, background: color }} />
                     </div>
                   </div>
                 );
@@ -422,8 +417,36 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Empty state — nothing created yet */}
-        {totalStreaks === 0 && missions.length === 0 && journals.length === 0 && (
+        {/* Recent Journals */}
+        {journals.length > 0 && (
+          <div className="rounded-2xl border mb-4 overflow-hidden" style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)" }}>
+            <div className="px-5 py-4 border-b border-white/6 flex items-center justify-between">
+              <p className="font-mono text-[10px] tracking-widest text-white/30 uppercase">Recent Journals</p>
+              <BookOpen size={11} className="text-white/20" />
+            </div>
+            <div className="px-5 py-2">
+              {journals.map((journal) => {
+                const hasTitle = journal.title?.trim().length > 0;
+                return (
+                  <div key={journal.id} className="flex items-center gap-3 py-3 border-b border-white/4 last:border-none">
+                    <div className="w-0.5 self-stretch rounded-full shrink-0" style={{ background: "rgba(200,240,76,0.2)" }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-mono text-xs text-white truncate">
+                        {hasTitle ? journal.title : <span className="text-white/30 italic">Untitled</span>}
+                      </p>
+                      <p className="font-mono text-[10px] text-white/25 mt-0.5">
+                        {formatDate(journal.updated_at)} · {formatTime(journal.updated_at)}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {allStreaks.length === 0 && missions.length === 0 && journals.length === 0 && (
           <div className="text-center py-24">
             <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5 border border-white/8" style={{ background: "#111" }}>
               <House size={22} className="text-white/20" />
