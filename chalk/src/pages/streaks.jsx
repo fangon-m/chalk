@@ -339,14 +339,7 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
               <div className="flex items-center gap-2 flex-wrap">
                 {streak.description && (
                   <p className="text-white/30 text-xs font-mono truncate">{streak.description}</p>
-                )}
-                {/* Schedule badge */}
-                {streak.scheduled_days && streak.scheduled_days.length > 0 && (
-                  <div className="flex items-center gap-1">
-                    <CalendarDays size={9} className="text-white/20" />
-                    <span className="font-mono text-[9px] text-white/20">{formatSchedule(streak.scheduled_days)}</span>
-                  </div>
-                )}
+                )}         
               </div>
             </div>
           </div>
@@ -366,16 +359,23 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
 
         {/* Stats footer */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <div className="flex items-center gap-1 text-white/25">
               <Flame size={11} style={{ color: getFlameColor(streak.current_streak ?? 0) }} />
-              <span className="font-mono text-[10px]">{streak.current_streak ?? 0} day{streak.current_streak !== 1 ? "s" : ""}</span>
+              <span className="font-mono text-[10px] -mb-0.5">{streak.current_streak ?? 0} day{streak.current_streak !== 1 ? "s" : ""}</span>
             </div>
             <div className="flex items-center gap-1 text-white/25">
               <Zap size={10} />
-              <span className="font-mono text-[10px]">best {streak.longest_streak ?? 0}</span>
+              <span className="font-mono text-[10px] -mb-0.5">best {streak.longest_streak ?? 0}</span>
             </div>
-            <ShieldPips count={streak.shields ?? 0} />
+            {/* Schedule badge */}
+                {streak.scheduled_days && streak.scheduled_days.length > 0 && (
+                  <div className="flex items-center gap-1">
+                    <CalendarDays size={10} className="text-white/25" />
+                    <span className="font-mono text-[10px] text-white/25 -mb-0.5">{formatSchedule(streak.scheduled_days)}</span>
+                  </div>
+                )}
+                <ShieldPips count={streak.shields ?? 0} />
           </div>
           <button onClick={handleExpand}
             className="flex items-center gap-1 font-mono text-[10px] tracking-widest text-white/35 hover:text-[#c8f04c] transition-colors cursor-pointer">
