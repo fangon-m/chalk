@@ -26,35 +26,17 @@ const DAYS = [
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function getTodayDow() {
-  return new Date().getDay(); // 0=Sun … 6=Sat
-}
+function getTodayDow() { return new Date().getDay(); }
 
 function isScheduledToday(scheduledDays) {
-  if (!scheduledDays || scheduledDays.length === 0) return true; // every day
+  if (!scheduledDays || scheduledDays.length === 0) return true;
   return scheduledDays.includes(getTodayDow());
 }
 
 function formatSchedule(scheduledDays) {
   if (!scheduledDays || scheduledDays.length === 0) return "Every day";
   if (scheduledDays.length === 7) return "Every day";
-  return scheduledDays
-    .slice()
-    .sort((a, b) => a - b)
-    .map(d => DAYS[d].label)
-    .join(", ");
-}
-
-function buildCalendarDots(logs = [], days = 28) {
-  const set = new Set(logs.map((l) => l.date));
-  const result = [];
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
-    result.push({ date: key, checked: set.has(key), isToday: i === 0 });
-  }
-  return result;
+  return scheduledDays.slice().sort((a, b) => a - b).map(d => DAYS[d].label).join(", ");
 }
 
 function getFlameColor(count) {
@@ -78,7 +60,6 @@ function getPriorityColor(priority) {
 // ── Day Picker ────────────────────────────────────────────────────────────────
 
 function DayPicker({ value, onChange }) {
-  // value: number[] | null — null/empty means every day
   const selected = value || [];
 
   function toggle(dow) {
@@ -124,43 +105,92 @@ function DayPicker({ value, onChange }) {
   );
 }
 
-// ── Calendar strip ────────────────────────────────────────────────────────────
+// ── Calendar Strip ────────────────────────────────────────────────────────────
+// Shows only scheduled dates for the current month, grouped by week row
 
 function CalendarStrip({ logs, scheduledDays = null }) {
-  const dots = buildCalendarDots(logs, 28);
-  const weeks = [];
-  for (let i = 0; i < dots.length; i += 7) weeks.push(dots.slice(i, i + 7));
+  const checkedSet = new Set(logs.map(l => l.date));
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
 
-  function isScheduledDay(dateStr) {
-    // If no scheduled days specified, treat as every day
-    if (!scheduledDays || scheduledDays.length === 0) return true;
-    const date = new Date(dateStr);
-    const dayOfWeek = date.getDay();
-    return scheduledDays.includes(dayOfWeek);
+  // Build all dates in the current month that match the schedule
+  const year  = today.getFullYear();
+  const month = today.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const scheduledDates = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(year, month, d);
+    const dow  = date.getDay();
+    const dateStr = date.toISOString().slice(0, 10);
+    const scheduled = !scheduledDays || scheduledDays.length === 0 || scheduledDays.includes(dow);
+    if (scheduled) {
+      const isFuture = date > today;
+      scheduledDates.push({
+        dateStr,
+        day: d,
+        dow,
+        checked: checkedSet.has(dateStr),
+        isToday: dateStr === todayStr,
+        isFuture,
+      });
+    }
   }
 
+  // Group into rows of 7 for display
+  const rows = [];
+  for (let i = 0; i < scheduledDates.length; i += 7) {
+    rows.push(scheduledDates.slice(i, i + 7));
+  }
+
+  const monthName = today.toLocaleString("en-US", { month: "long" });
+
   return (
-    <div className="flex gap-1 mt-2">
-      {weeks.map((week, wi) => (
-        <div key={wi} className="flex flex-col gap-1">
-          {week.map((day, di) => {
-            const isScheduled = isScheduledDay(day.date);
-            return (
+    <div className="mt-2">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="font-mono text-[10px] tracking-widest text-white/25 uppercase">{monthName}</span>
+        <span className="font-mono text-[10px] text-white/15">
+          {scheduledDates.filter(d => d.checked).length}/{scheduledDates.filter(d => !d.isFuture).length} checked
+        </span>
+      </div>
+      <div className="flex flex-col gap-1">
+        {rows.map((row, ri) => (
+          <div key={ri} className="flex gap-1">
+            {row.map((item) => (
               <div
-                key={di}
-                title={day.date}
-                className="w-2.5 h-2.5 rounded-sm"
-                style={{
-                  background: day.checked ? "#c8f04c" : isScheduled ? "rgba(120,120,120,0.4)" : "rgba(60,60,60,0.3)",
-                  outline: day.isToday ? "1.5px solid #c8f04c" : "none",
-                  outlineOffset: 1,
-                  opacity: 1,
-                }}
-              />
-            );
-          })}
-        </div>
-      ))}
+                key={item.dateStr}
+                title={`${item.dateStr}${item.isToday ? " (today)" : ""}`}
+                className="flex flex-col items-center gap-0.5"
+              >
+                {/* Day number */}
+                <span
+                  className="font-mono leading-none"
+                  style={{
+                    fontSize: 8,
+                    color: item.isToday ? "#c8f04c" : "rgba(255,255,255,0.2)",
+                    fontWeight: item.isToday ? "500" : "300",
+                  }}
+                >
+                  {item.day}
+                </span>
+                {/* Dot */}
+                <div
+                  className="w-2.5 h-2.5 rounded-sm"
+                  style={{
+                    background: item.checked
+                      ? "#c8f04c"
+                      : item.isFuture
+                      ? "rgba(255,255,255,0.04)"
+                      : "rgba(255,255,255,0.12)",
+                    outline: item.isToday ? "1.5px solid #c8f04c" : "none",
+                    outlineOffset: 1,
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -282,9 +312,9 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const checkedToday  = streak._checkedToday ?? false;
+  const checkedToday   = streak._checkedToday ?? false;
   const scheduledToday = isScheduledToday(streak.scheduled_days);
-  const accentColor   = scheduledToday ? (streak.color || "#c8f04c") : "#6b7280";
+  const accentColor    = scheduledToday ? (streak.color || "#c8f04c") : "#6b7280";
 
   async function handleExpand() {
     const next = !expanded;
@@ -310,13 +340,12 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
         {/* Top row */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-start gap-3 flex-1 min-w-0">
-            {/* Check-in button */}
             <button
               onClick={() => scheduledToday && !checkedToday && onCheckIn(streak.id)}
               disabled={!scheduledToday || checkedToday || checkingIn === streak.id}
               className="shrink-0 w-8 h-8 rounded-lg border flex items-center justify-center transition-all"
               style={{
-                background: checkedToday ? `${accentColor}22` : "rgba(255,255,255,0.08)",
+                background:  checkedToday ? `${accentColor}22` : "rgba(255,255,255,0.08)",
                 borderColor: checkedToday ? accentColor : "rgba(255,255,255,0.1)",
                 cursor: (!scheduledToday || checkedToday) ? "default" : "pointer",
               }}
@@ -330,7 +359,6 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
               )}
             </button>
 
-            {/* Name + description */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                 <h3 className="font-mono text-sm text-white">{streak.name}</h3>
@@ -350,12 +378,11 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
               <div className="flex items-center gap-2 flex-wrap">
                 {streak.description && (
                   <p className="text-white/30 text-xs font-mono truncate">{streak.description}</p>
-                )}         
+                )}
               </div>
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
             <button onClick={(e) => { e.stopPropagation(); onEdit(streak); }}
               className="p-1.5 rounded-lg hover:bg-white/8 text-white/30 hover:text-white/70 transition-all cursor-pointer">
@@ -373,20 +400,19 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1 text-white/25">
               <Flame size={11} style={{ color: getFlameColor(streak.current_streak ?? 0) }} />
-              <span className="font-mono text-[10px] -mb-0.5">{streak.current_streak ?? 0} day{streak.current_streak !== 1 ? "s" : ""}</span>
+              <span className="font-mono text-[10px]">{streak.current_streak ?? 0} day{streak.current_streak !== 1 ? "s" : ""}</span>
             </div>
             <div className="flex items-center gap-1 text-white/25">
               <Zap size={10} />
-              <span className="font-mono text-[10px] -mb-0.5">best {streak.longest_streak ?? 0}</span>
+              <span className="font-mono text-[10px]">best {streak.longest_streak ?? 0}</span>
             </div>
-            {/* Schedule badge */}
-                {streak.scheduled_days && streak.scheduled_days.length > 0 && (
-                  <div className="flex items-center gap-1">
-                    <CalendarDays size={10} className="text-white/25" />
-                    <span className="font-mono text-[10px] text-white/25 -mb-0.5">{formatSchedule(streak.scheduled_days)}</span>
-                  </div>
-                )}
-                <ShieldPips count={streak.shields ?? 0} />
+            {streak.scheduled_days && streak.scheduled_days.length > 0 && (
+              <div className="flex items-center gap-1">
+                <CalendarDays size={10} className="text-white/25" />
+                <span className="font-mono text-[10px] text-white/25">{formatSchedule(streak.scheduled_days)}</span>
+              </div>
+            )}
+            <ShieldPips count={streak.shields ?? 0} />
           </div>
           <button onClick={handleExpand}
             className="flex items-center gap-1 font-mono text-[10px] tracking-widest text-white/35 hover:text-[#c8f04c] transition-colors cursor-pointer">
@@ -405,7 +431,6 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
             ) : (
               <div className="flex gap-5">
                 <div className="shrink-0">
-                  <span className="font-mono text-[10px] tracking-widest text-white/25 uppercase">Last 28 Days</span>
                   <CalendarStrip logs={logs || []} scheduledDays={streak.scheduled_days} />
                 </div>
                 <div className="w-px self-stretch shrink-0" style={{ background: "rgba(255,255,255,0.06)" }} />
@@ -438,8 +463,8 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
 function StreakModal({ streak, onClose, onSave }) {
   const isEdit = !!streak?.id;
   const [form, setForm] = useState({
-    name:           streak?.name          || "",
-    description:    streak?.description   || "",
+    name:           streak?.name           || "",
+    description:    streak?.description    || "",
     scheduled_days: streak?.scheduled_days || null,
   });
   const [saving, setSaving] = useState(false);
@@ -455,11 +480,8 @@ function StreakModal({ streak, onClose, onSave }) {
         description:    form.description.trim() || null,
         scheduled_days: form.scheduled_days?.length > 0 ? form.scheduled_days : null,
       };
-      if (isEdit) {
-        await updateStreak(streak.id, payload);
-      } else {
-        await createStreak(payload);
-      }
+      if (isEdit) await updateStreak(streak.id, payload);
+      else        await createStreak(payload);
       onSave();
     } catch (e) {
       setError(e.message);
@@ -472,7 +494,6 @@ function StreakModal({ streak, onClose, onSave }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center"
       style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)" }}>
       <div className="relative w-full max-w-lg mx-4 rounded-2xl border border-white/10 overflow-hidden" style={{ background: "#111" }}>
-        {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-white/8">
           <h2 className="font-mono text-sm tracking-widest text-white/80 uppercase">
             {isEdit ? "Edit Streak" : "New Streak"}
@@ -480,13 +501,10 @@ function StreakModal({ streak, onClose, onSave }) {
           <button onClick={onClose} className="text-white/30 hover:text-white/70 transition-colors cursor-pointer"><X size={16} /></button>
         </div>
 
-        {/* Body */}
         <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
-          {/* Name */}
           <div>
             <label className="block font-mono text-[10px] tracking-widest text-white/40 uppercase mb-1.5">Streak Name</label>
-            <input
-              value={form.name}
+            <input value={form.name}
               onChange={(e) => { setForm({ ...form, name: e.target.value }); setError(""); }}
               placeholder="What habit are you building?"
               className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors"
@@ -494,36 +512,29 @@ function StreakModal({ streak, onClose, onSave }) {
             {error && <p className="font-mono text-[10px] text-red-400 mt-1">{error}</p>}
           </div>
 
-          {/* Description */}
           <div>
             <label className="block font-mono text-[10px] tracking-widest text-white/40 uppercase mb-1.5">Description</label>
-            <input
-              value={form.description}
+            <input value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               placeholder="Brief context..."
               className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors"
             />
           </div>
 
-          {/* Schedule */}
           <DayPicker
             value={form.scheduled_days}
             onChange={(v) => setForm({ ...form, scheduled_days: v })}
           />
         </div>
 
-        {/* Footer */}
         <div className="px-6 py-4 border-t border-white/8 flex justify-end gap-3">
           <button onClick={onClose}
             className="px-4 py-2 rounded-lg border border-white/10 text-white/40 font-mono text-xs tracking-widest hover:text-white/60 transition-colors cursor-pointer">
             CANCEL
           </button>
-          <button
-            onClick={handleSubmit}
-            disabled={saving || !form.name.trim()}
+          <button onClick={handleSubmit} disabled={saving || !form.name.trim()}
             className="px-5 py-2 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
-            style={{ background: form.name.trim() ? "#c8f04c" : "#444", color: "#0d0d0d" }}
-          >
+            style={{ background: form.name.trim() ? "#c8f04c" : "#444", color: "#0d0d0d" }}>
             {saving && <Loader2 size={12} className="animate-spin" />}
             {isEdit ? "SAVE CHANGES" : "CREATE STREAK"}
           </button>
@@ -536,14 +547,14 @@ function StreakModal({ streak, onClose, onSave }) {
 // ── Main Streaks Page ─────────────────────────────────────────────────────────
 
 export default function Streaks() {
-  const [streaks, setStreaks]       = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [pageError, setPageError]   = useState("");
-  const [checkingIn, setCheckingIn] = useState(null);
-  const [showModal, setShowModal]   = useState(false);
+  const [streaks, setStreaks]             = useState([]);
+  const [loading, setLoading]             = useState(true);
+  const [pageError, setPageError]         = useState("");
+  const [checkingIn, setCheckingIn]       = useState(null);
+  const [showModal, setShowModal]         = useState(false);
   const [editingStreak, setEditingStreak] = useState(null);
-  const [tab, setTab]               = useState("active");
-  const [todayMap, setTodayMap]     = useState({});
+  const [tab, setTab]                     = useState("active");
+  const [todayMap, setTodayMap]           = useState({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -602,16 +613,12 @@ export default function Streaks() {
     }
   }
 
-  // Enrich streaks with today check-in status
-  const enriched = streaks.map((s) => ({ ...s, _checkedToday: !!todayMap[s.id] }));
-
-  // For tabs: only count streaks that are scheduled today
+  const enriched      = streaks.map((s) => ({ ...s, _checkedToday: !!todayMap[s.id] }));
   const scheduledToday = enriched.filter(s => isScheduledToday(s.scheduled_days));
-  const doneCount  = scheduledToday.filter(s => s._checkedToday).length;
-  const totalCount = streaks.length;
+  const doneCount      = scheduledToday.filter(s => s._checkedToday).length;
+  const totalCount     = streaks.length;
   const scheduledCount = scheduledToday.length;
 
-  // Filter by tab — always show all streaks, but grayed out if off today
   const filtered = tab === "done"
     ? enriched.filter(s => s._checkedToday)
     : enriched.filter(s => !s._checkedToday);
@@ -635,7 +642,6 @@ export default function Streaks() {
 
       <div className="max-w-2xl mx-auto px-6 py-10">
 
-        {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -656,7 +662,6 @@ export default function Streaks() {
           </button>
         </div>
 
-        {/* Tabs */}
         {totalCount > 0 && (
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: "#111" }}>
@@ -677,7 +682,6 @@ export default function Streaks() {
           </div>
         )}
 
-        {/* Error */}
         {pageError && (
           <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 mb-4">
             <AlertTriangle size={13} className="text-red-400 shrink-0" />
@@ -686,7 +690,6 @@ export default function Streaks() {
           </div>
         )}
 
-        {/* Streak list */}
         {totalCount === 0 ? (
           <div className="text-center py-24">
             <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/8" style={{ background: "#111" }}>
@@ -724,7 +727,6 @@ export default function Streaks() {
           </div>
         )}
 
-        {/* Shield info footer */}
         {totalCount > 0 && (
           <div className="mt-6 flex items-center gap-2 px-4 py-3 rounded-xl border border-blue-400/15 bg-blue-400/5">
             <Shield size={13} className="text-blue-400 shrink-0" />
