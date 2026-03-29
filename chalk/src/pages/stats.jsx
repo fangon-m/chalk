@@ -17,30 +17,28 @@ const QUOTES = [
   { text: "Success is not final, failure is not fatal: it is the courage to continue that counts.", author: "Winston Churchill" },
   { text: "Champions keep playing until they get it right.", author: "Billie Jean King" },
   { text: "The difference between ordinary and extraordinary is that little extra.", author: "Jimmy Johnson" },
-  { text: "Without effort, your talent is nothing more than your unmet potential.", author: "Angela Duckworth" },
+  { text: "Gold medals aren't really made of gold. They're made of sweat, determination, and a hard-to-find alloy called guts.", author: "Dan Gable" },
   { text: "Do not wait to strike till the iron is hot, but make it hot by striking.", author: "William Butler Yeats" },
-  { text: "You have to believe in yourself when no one else does.", author: "Naomi Osaka" },
+  { text: "I've missed more than 9,000 shots in my career. I've lost almost 300 games. I've failed over and over again. And that is why I succeed.", author: "Michael Jordan" },
   { text: "Pain is temporary. Quitting lasts forever.", author: "Lance Armstrong" },
   { text: "The secret of getting ahead is getting started.", author: "Mark Twain" },
   { text: "You have to expect things of yourself before you can do them.", author: "Michael Jordan" },
   { text: "Winning isn't everything, but wanting to win is.", author: "Vince Lombardi" },
-  { text: "There are no shortcuts to excellence.", author: "Angela Duckworth" },
+  { text: "Don't watch the clock; do what it does. Keep going.", author: "Sam Levenson" },
   { text: "It always seems impossible until it's done.", author: "Nelson Mandela" },
   { text: "Discipline is the bridge between goals and accomplishment.", author: "Jim Rohn" },
   { text: "The harder the battle, the sweeter the victory.", author: "Les Brown" },
   { text: "You don't have to be great to start, but you have to start to be great.", author: "Zig Ziglar" },
   { text: "Push yourself, because no one else is going to do it for you.", author: "Anonymous" },
-  { text: "Done is better than perfect.", author: "Sheryl Sandberg" },
+  { text: "The only limit to our realization of tomorrow is our doubts of today.", author: "Franklin D. Roosevelt" },
   { text: "Act as if what you do makes a difference. It does.", author: "William James" },
   { text: "Believe you can and you're halfway there.", author: "Theodore Roosevelt" },
   { text: "Energy and persistence conquer all things.", author: "Benjamin Franklin" },
   { text: "I hated every minute of training, but I said: don't quit. Suffer now and live the rest of your life as a champion.", author: "Muhammad Ali" },
-  { text: "Hard work is worthless for those that don’t believe in themselves.", author: "Uzumaki Naruto" },
+  { text: "The more I practice, the luckier I get.", author: "Gary Player" },
   { text: "Do what you have to do until you can do what you want to do.", author: "Oprah Winfrey" },
-  { text: "My magic is never giving up.", author: "Asta" },
-  { text: "Not everyone who works hard is rewarded. But all those who succeed have worked hard.", author: "Genji Kamogawa" },
-  { text: "There is no tomorrow.", author: "Apollo Creed" },
-  { text: "You have no limits.", author: "Chalk Dev" },
+  { text: "Success usually comes to those who are too busy to be looking for it.", author: "Henry David Thoreau" },
+  { text: "Without continual growth and progress, such words as improvement and success have no meaning.", author: "Benjamin Franklin" },
 ];
 
 function getDailyQuote() {
@@ -56,12 +54,29 @@ function getMonthRange() {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
-  const firstDay = new Date(year, month, 1).toISOString().slice(0, 10);
-  const today = now.toISOString().slice(0, 10);
+  const pad = (n) => String(n).padStart(2, "0");
+  const firstDay = `${year}-${pad(month + 1)}-01`;
+  const today    = `${year}-${pad(month + 1)}-${pad(now.getDate())}`;
   const daysElapsed = now.getDate();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const monthName = now.toLocaleString("en-US", { month: "long" });
   return { firstDay, today, daysElapsed, daysInMonth, monthName, year };
+}
+
+// Returns how many scheduled days have elapsed so far this month
+// null/empty scheduledDays = every day
+function scheduledDaysElapsed(scheduledDays) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const todayDate = now.getDate();
+  if (!scheduledDays || scheduledDays.length === 0) return todayDate;
+  let count = 0;
+  for (let d = 1; d <= todayDate; d++) {
+    const dow = new Date(year, month, d).getDay();
+    if (scheduledDays.includes(dow)) count++;
+  }
+  return count;
 }
 
 function getFlameColor(count) {
@@ -209,8 +224,9 @@ function LifeScoreRing({ score, isComplete }) {
 
 // ── Streak Row ────────────────────────────────────────────────────────────────
 
-function StreakStatRow({ streak, checkedInDays, daysElapsed }) {
-  const consistency = daysElapsed > 0 ? Math.round((checkedInDays / daysElapsed) * 100) : 0;
+function StreakStatRow({ streak, checkedInDays }) {
+  const elapsed    = scheduledDaysElapsed(streak.scheduled_days);
+  const consistency = elapsed > 0 ? Math.round((checkedInDays / elapsed) * 100) : 0;
   const barColor = consistency === 100 ? "#c8f04c"
     : consistency >= 75 ? "#eab308"
     : consistency >= 50 ? "#f97316"
@@ -227,7 +243,7 @@ function StreakStatRow({ streak, checkedInDays, daysElapsed }) {
           <div className="h-full rounded-full transition-all duration-700" style={{ width: `${consistency}%`, background: barColor }} />
         </div>
         <span className="font-mono text-[11px] w-8 text-right" style={{ color: barColor }}>{consistency}%</span>
-        <span className="font-mono text-[10px] text-white/25 w-14 text-right">{checkedInDays}/{daysElapsed}d</span>
+        <span className="font-mono text-[10px] text-white/25 w-14 text-right">{checkedInDays}/{elapsed}d</span>
         {consistency === 100 && <CheckCircle2 size={12} style={{ color: "#c8f04c" }} />}
       </div>
     </div>
@@ -338,7 +354,8 @@ export default function Stats() {
 
   const streakConsistencies = streaks.map((s) => {
     const checkedIn = streakLogs[s.id]?.size ?? 0;
-    return daysElapsed > 0 ? checkedIn / daysElapsed : 0;
+    const elapsed   = scheduledDaysElapsed(s.scheduled_days);
+    return elapsed > 0 ? checkedIn / elapsed : 0;
   });
 
   const lifeScore = streaks.length > 0
@@ -403,11 +420,11 @@ export default function Stats() {
         >
           <p
             className="font-mono text-sm leading-relaxed mb-3"
-            style={{ color: "rgba(255,255,255,0.40)", fontStyle: "italic" }}
+            style={{ color: "rgba(255,255,255,0.65)", fontStyle: "italic" }}
           >
             "{dailyQuote.text}"
           </p>
-          <p className="font-mono text-[10px] tracking-widest" style={{ color: "rgba(255,255,255,0.30)" }}>
+          <p className="font-mono text-[10px] tracking-widest" style={{ color: "rgba(200,240,76,0.5)" }}>
             — {dailyQuote.author}
           </p>
         </div>
@@ -476,7 +493,6 @@ export default function Stats() {
                   key={streak.id}
                   streak={streak}
                   checkedInDays={streakLogs[streak.id]?.size ?? 0}
-                  daysElapsed={daysElapsed}
                 />
               ))}
             </div>
