@@ -265,7 +265,7 @@ export default function Dashboard() {
 
         {/* Daily Quote */}
         <div className="rounded-2xl border mb-4 px-6 py-5"
-          style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)", borderLeft: "2px solid rgba(200,240,76,0.25)" }}>
+          style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)" }}>
           <p className="font-mono text-sm leading-relaxed mb-3" style={{ color: "rgba(255,255,255,0.40)", fontStyle: "italic" }}>
             "{dailyQuote.text}"
           </p>
@@ -276,7 +276,7 @@ export default function Dashboard() {
 
         {/* Life Score Card */}
         <div className="rounded-2xl border mb-4 overflow-hidden"
-          style={{ background: "#111", borderColor: isComplete ? "rgba(200,240,76,0.25)" : "rgba(255,255,255,0.08)" }}>
+          style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)" }}>
           {isComplete && <div className="h-0.5 w-full" style={{ background: "#c8f04c" }} />}
           <div className="px-6 py-6">
             <div className="flex items-center justify-between mb-6">

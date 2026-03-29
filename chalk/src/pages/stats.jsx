@@ -420,11 +420,11 @@ export default function Stats() {
         >
           <p
             className="font-mono text-sm leading-relaxed mb-3"
-            style={{ color: "rgba(255,255,255,0.65)", fontStyle: "italic" }}
+            style={{ color: "rgba(255,255,255,0.40)", fontStyle: "italic" }}
           >
             "{dailyQuote.text}"
           </p>
-          <p className="font-mono text-[10px] tracking-widest" style={{ color: "rgba(200,240,76,0.5)" }}>
+          <p className="font-mono text-[10px] tracking-widest" style={{ color: "rgba(255,255,255,0.30)" }}>
             — {dailyQuote.author}
           </p>
         </div>
