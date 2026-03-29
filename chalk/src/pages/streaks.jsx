@@ -111,9 +111,12 @@ function DayPicker({ value, onChange }) {
 function CalendarStrip({ logs, scheduledDays = null }) {
   const checkedSet = new Set(logs.map(l => l.date));
   const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
+  const todayStr = [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, "0"),
+    String(today.getDate()).padStart(2, "0"),
+  ].join("-");
 
-  // Build all dates in the current month that match the schedule
   const year  = today.getFullYear();
   const month = today.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -122,10 +125,16 @@ function CalendarStrip({ logs, scheduledDays = null }) {
   for (let d = 1; d <= daysInMonth; d++) {
     const date = new Date(year, month, d);
     const dow  = date.getDay();
-    const dateStr = date.toISOString().slice(0, 10);
+    // Build dateStr using local date parts — avoids UTC timezone shift
+    const dateStr = [
+      year,
+      String(month + 1).padStart(2, "0"),
+      String(d).padStart(2, "0"),
+    ].join("-");
     const scheduled = !scheduledDays || scheduledDays.length === 0 || scheduledDays.includes(dow);
     if (scheduled) {
-      const isFuture = date > today;
+      // Compare dates without time to avoid UTC offset issues
+      const isFuture = date.setHours(0,0,0,0) > today.setHours(0,0,0,0);
       scheduledDates.push({
         dateStr,
         day: d,
@@ -149,8 +158,8 @@ function CalendarStrip({ logs, scheduledDays = null }) {
     <div className="mt-2">
       <div className="flex items-center gap-2 mb-2">
         <span className="font-mono text-[10px] tracking-widest text-white/25 uppercase">{monthName}</span>
-        <span className="font-mono text-[10px] text-white/15 ml-5">
-          {scheduledDates.filter(d => d.checked).length}/{scheduledDates.filter(d => !d.isFuture).length}
+        <span className="font-mono text-[10px] text-white/15">
+          {scheduledDates.filter(d => d.checked).length}/{scheduledDates.filter(d => !d.isFuture).length} checked
         </span>
       </div>
       <div className="flex flex-col gap-1">
@@ -559,7 +568,12 @@ export default function Streaks() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const today   = new Date().toISOString().slice(0, 10);
+      const now = new Date();
+      const today = [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, "0"),
+        String(now.getDate()).padStart(2, "0"),
+      ].join("-");
       const lastRun = localStorage.getItem("chalk_missed_streaks_date");
       if (lastRun !== today) {
         await supabase.rpc("handle_missed_streaks");
