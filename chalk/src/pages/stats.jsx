@@ -63,16 +63,26 @@ function getMonthRange() {
   return { firstDay, today, daysElapsed, daysInMonth, monthName, year };
 }
 
-// Returns how many scheduled days have elapsed so far this month
-// null/empty scheduledDays = every day
-function scheduledDaysElapsed(scheduledDays) {
+// Returns how many scheduled days have elapsed so far this month,
+// starting from the streak's created_at date (not the 1st of the month)
+function scheduledDaysElapsed(scheduledDays, createdAt = null) {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
   const todayDate = now.getDate();
-  if (!scheduledDays || scheduledDays.length === 0) return todayDate;
+
+  // Find the start day within this month (either 1st or created date if this month)
+  let startDay = 1;
+  if (createdAt) {
+    const c = new Date(createdAt);
+    if (c.getFullYear() === year && c.getMonth() === month) {
+      startDay = c.getDate();
+    }
+  }
+
+  if (!scheduledDays || scheduledDays.length === 0) return todayDate - startDay + 1;
   let count = 0;
-  for (let d = 1; d <= todayDate; d++) {
+  for (let d = startDay; d <= todayDate; d++) {
     const dow = new Date(year, month, d).getDay();
     if (scheduledDays.includes(dow)) count++;
   }
@@ -225,7 +235,7 @@ function LifeScoreRing({ score, isComplete }) {
 // ── Streak Row ────────────────────────────────────────────────────────────────
 
 function StreakStatRow({ streak, checkedInDays }) {
-  const elapsed    = scheduledDaysElapsed(streak.scheduled_days);
+  const elapsed     = scheduledDaysElapsed(streak.scheduled_days, streak.created_at);
   const consistency = elapsed > 0 ? Math.round((checkedInDays / elapsed) * 100) : 0;
   const barColor = consistency === 100 ? "#c8f04c"
     : consistency >= 75 ? "#eab308"
@@ -353,8 +363,19 @@ export default function Stats() {
   useEffect(() => { load(); }, [load]);
 
   const streakConsistencies = streaks.map((s) => {
-    const checkedIn = streakLogs[s.id]?.size ?? 0;
-    const elapsed   = scheduledDaysElapsed(s.scheduled_days);
+    const logs = streakLogs[s.id];
+    // Only count check-ins from the streak's created_at date onward
+    let checkedIn = 0;
+    if (logs) {
+      const c = new Date(s.created_at);
+      const createdDateStr = [
+        c.getFullYear(),
+        String(c.getMonth() + 1).padStart(2, "0"),
+        String(c.getDate()).padStart(2, "0"),
+      ].join("-");
+      checkedIn = [...logs].filter(d => d >= createdDateStr).length;
+    }
+    const elapsed = scheduledDaysElapsed(s.scheduled_days, s.created_at);
     return elapsed > 0 ? checkedIn / elapsed : 0;
   });
 
@@ -420,11 +441,11 @@ export default function Stats() {
         >
           <p
             className="font-mono text-sm leading-relaxed mb-3"
-            style={{ color: "rgba(255,255,255,0.40)", fontStyle: "italic" }}
+            style={{ color: "rgba(255,255,255,0.65)", fontStyle: "italic" }}
           >
             "{dailyQuote.text}"
           </p>
-          <p className="font-mono text-[10px] tracking-widest" style={{ color: "rgba(255,255,255,0.30)" }}>
+          <p className="font-mono text-[10px] tracking-widest" style={{ color: "rgba(200,240,76,0.5)" }}>
             — {dailyQuote.author}
           </p>
         </div>
@@ -488,13 +509,26 @@ export default function Stats() {
         {streaks.length > 0 && (
           <CollapsibleSection title="Streak Consistency" subtitle="This month">
             <div className="px-5">
-              {streaks.map((streak, i) => (
-                <StreakStatRow
-                  key={streak.id}
-                  streak={streak}
-                  checkedInDays={streakLogs[streak.id]?.size ?? 0}
-                />
-              ))}
+              {streaks.map((streak) => {
+                const logs = streakLogs[streak.id];
+                let checkedInDays = 0;
+                if (logs) {
+                  const c = new Date(streak.created_at);
+                  const createdDateStr = [
+                    c.getFullYear(),
+                    String(c.getMonth() + 1).padStart(2, "0"),
+                    String(c.getDate()).padStart(2, "0"),
+                  ].join("-");
+                  checkedInDays = [...logs].filter(d => d >= createdDateStr).length;
+                }
+                return (
+                  <StreakStatRow
+                    key={streak.id}
+                    streak={streak}
+                    checkedInDays={checkedInDays}
+                  />
+                );
+              })}
             </div>
           </CollapsibleSection>
         )}
