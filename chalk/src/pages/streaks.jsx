@@ -108,7 +108,7 @@ function DayPicker({ value, onChange }) {
 // ── Calendar Strip ────────────────────────────────────────────────────────────
 // Shows only scheduled dates for the current month, grouped by week row
 
-function CalendarStrip({ logs, scheduledDays = null }) {
+function CalendarStrip({ logs, scheduledDays = null, createdAt = null }) {
   const checkedSet = new Set(logs.map(l => l.date));
   const today = new Date();
   const todayStr = [
@@ -121,24 +121,35 @@ function CalendarStrip({ logs, scheduledDays = null }) {
   const month = today.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
+  // Parse created date in local time — only show dates from creation onward
+  let createdDateStr = null;
+  if (createdAt) {
+    const c = new Date(createdAt);
+    createdDateStr = [
+      c.getFullYear(),
+      String(c.getMonth() + 1).padStart(2, "0"),
+      String(c.getDate()).padStart(2, "0"),
+    ].join("-");
+  }
+
   const scheduledDates = [];
   for (let d = 1; d <= daysInMonth; d++) {
     const date = new Date(year, month, d);
     const dow  = date.getDay();
-    // Build dateStr using local date parts — avoids UTC timezone shift
     const dateStr = [
       year,
       String(month + 1).padStart(2, "0"),
       String(d).padStart(2, "0"),
     ].join("-");
+
+    // Skip dates before streak was created
+    if (createdDateStr && dateStr < createdDateStr) continue;
+
     const scheduled = !scheduledDays || scheduledDays.length === 0 || scheduledDays.includes(dow);
     if (scheduled) {
-      // Compare dates without time to avoid UTC offset issues
       const isFuture = date.setHours(0,0,0,0) > today.setHours(0,0,0,0);
       scheduledDates.push({
-        dateStr,
-        day: d,
-        dow,
+        dateStr, day: d, dow,
         checked: checkedSet.has(dateStr),
         isToday: dateStr === todayStr,
         isFuture,
@@ -440,7 +451,7 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
             ) : (
               <div className="flex gap-5">
                 <div className="shrink-0">
-                  <CalendarStrip logs={logs || []} scheduledDays={streak.scheduled_days} />
+                  <CalendarStrip logs={logs || []} scheduledDays={streak.scheduled_days} createdAt={streak.created_at} />
                 </div>
                 <div className="w-px self-stretch shrink-0" style={{ background: "rgba(255,255,255,0.06)" }} />
                 <div className="flex-1 min-w-0">
@@ -635,7 +646,13 @@ export default function Streaks() {
 
   const filtered = tab === "done"
     ? enriched.filter(s => s._checkedToday)
-    : enriched.filter(s => !s._checkedToday);
+    : enriched
+        .filter(s => !s._checkedToday)
+        .sort((a, b) => {
+          const aOff = !isScheduledToday(a.scheduled_days);
+          const bOff = !isScheduledToday(b.scheduled_days);
+          return aOff === bOff ? 0 : aOff ? 1 : -1;
+        });
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: "#0d0d0d" }}>
