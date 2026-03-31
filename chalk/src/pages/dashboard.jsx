@@ -277,7 +277,7 @@ export default function Dashboard() {
         {/* Life Score Card */}
         <div className="rounded-2xl border mb-4 overflow-hidden"
           style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)" }}>
-          {isComplete && <div className="h-0.5 w-full" style={{ background: "#c8f04c" }} />}
+          {isComplete && <div className="h-0.5 w-full" />}
           <div className="px-6 py-6">
             <div className="flex items-center justify-between mb-6">
               <div>
@@ -290,7 +290,7 @@ export default function Dashboard() {
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
                   style={{ background: "rgba(200,240,76,0.08)", border: "1px solid rgba(200,240,76,0.2)" }}>
                   <Award size={12} style={{ color: "#c8f04c" }} />
-                  <span className="font-mono text-[10px] tracking-widest" style={{ color: "#c8f04c" }}>PERFECT DAY</span>
+                  <span className="font-mono text-[10px] tracking-widest mt-0.5" style={{ color: "#c8f04c" }}>PERFECT DAY</span>
                 </div>
               )}
             </div>
