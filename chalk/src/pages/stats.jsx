@@ -71,16 +71,24 @@ function scheduledDaysElapsed(scheduledDays, createdAt = null) {
   const month = now.getMonth();
   const todayDate = now.getDate();
 
-  // Find the start day within this month (either 1st or created date if this month)
+  // Parse created_at into local date parts to avoid UTC shift
   let startDay = 1;
   if (createdAt) {
     const c = new Date(createdAt);
-    if (c.getFullYear() === year && c.getMonth() === month) {
-      startDay = c.getDate();
+    const cy = c.getFullYear();
+    const cm = c.getMonth();
+    if (cy === year && cm === month) {
+      startDay = c.getDate(); // getDate() is always local
+    } else if (cy > year || (cy === year && cm > month)) {
+      // Created in the future — no days elapsed
+      return 0;
     }
+    // If created before this month, startDay stays 1
   }
 
-  if (!scheduledDays || scheduledDays.length === 0) return todayDate - startDay + 1;
+  if (!scheduledDays || scheduledDays.length === 0) {
+    return Math.max(0, todayDate - startDay + 1);
+  }
   let count = 0;
   for (let d = startDay; d <= todayDate; d++) {
     const dow = new Date(year, month, d).getDay();
@@ -236,7 +244,7 @@ function LifeScoreRing({ score, isComplete }) {
 
 function StreakStatRow({ streak, checkedInDays }) {
   const elapsed     = scheduledDaysElapsed(streak.scheduled_days, streak.created_at);
-  const consistency = elapsed > 0 ? Math.round((checkedInDays / elapsed) * 100) : 0;
+  const consistency = elapsed > 0 ? Math.min(100, Math.round((checkedInDays / elapsed) * 100)) : 0;
   const barColor = consistency === 100 ? "#c8f04c"
     : consistency >= 75 ? "#eab308"
     : consistency >= 50 ? "#f97316"
@@ -253,7 +261,7 @@ function StreakStatRow({ streak, checkedInDays }) {
           <div className="h-full rounded-full transition-all duration-700" style={{ width: `${consistency}%`, background: barColor }} />
         </div>
         <span className="font-mono text-[11px] w-8 text-right" style={{ color: barColor }}>{consistency}%</span>
-        <span className="font-mono text-[10px] text-white/25 w-14 text-right">{checkedInDays}/{elapsed}d</span>
+        <span className="font-mono text-[10px] text-white/25 w-14 text-right">{Math.min(checkedInDays, elapsed)}/{elapsed}d</span>
         {consistency === 100 && <CheckCircle2 size={12} style={{ color: "#c8f04c" }} />}
       </div>
     </div>
@@ -364,10 +372,10 @@ export default function Stats() {
 
   const streakConsistencies = streaks.map((s) => {
     const logs = streakLogs[s.id];
-    // Only count check-ins from the streak's created_at date onward
     let checkedIn = 0;
     if (logs) {
       const c = new Date(s.created_at);
+      // Use local date parts to avoid UTC shift
       const createdDateStr = [
         c.getFullYear(),
         String(c.getMonth() + 1).padStart(2, "0"),
@@ -376,7 +384,7 @@ export default function Stats() {
       checkedIn = [...logs].filter(d => d >= createdDateStr).length;
     }
     const elapsed = scheduledDaysElapsed(s.scheduled_days, s.created_at);
-    return elapsed > 0 ? checkedIn / elapsed : 0;
+    return elapsed > 0 ? Math.min(checkedIn / elapsed, 1) : 0;
   });
 
   const lifeScore = streaks.length > 0
@@ -519,7 +527,11 @@ export default function Stats() {
                     String(c.getMonth() + 1).padStart(2, "0"),
                     String(c.getDate()).padStart(2, "0"),
                   ].join("-");
-                  checkedInDays = [...logs].filter(d => d >= createdDateStr).length;
+                  const elapsed = scheduledDaysElapsed(streak.scheduled_days, streak.created_at);
+                  checkedInDays = Math.min(
+                    [...logs].filter(d => d >= createdDateStr).length,
+                    elapsed
+                  );
                 }
                 return (
                   <StreakStatRow
