@@ -71,19 +71,20 @@ function scheduledDaysElapsed(scheduledDays, createdAt = null) {
   const month = now.getMonth();
   const todayDate = now.getDate();
 
-  // Parse created_at into local date parts to avoid UTC shift
+  // Parse created_at into local parts — new Date() alone shifts UTC to local
   let startDay = 1;
   if (createdAt) {
-    const c = new Date(createdAt);
-    const cy = c.getFullYear();
-    const cm = c.getMonth();
+    const raw = new Date(createdAt);
+    // Reconstruct in local time to avoid UTC offset shift
+    const cy = raw.getFullYear();
+    const cm = raw.getMonth();
+    const cd = raw.getDate();
     if (cy === year && cm === month) {
-      startDay = c.getDate(); // getDate() is always local
+      startDay = cd;
     } else if (cy > year || (cy === year && cm > month)) {
-      // Created in the future — no days elapsed
-      return 0;
+      return 0; // created in the future
     }
-    // If created before this month, startDay stays 1
+    // created before this month → startDay stays 1
   }
 
   if (!scheduledDays || scheduledDays.length === 0) {
@@ -94,7 +95,41 @@ function scheduledDaysElapsed(scheduledDays, createdAt = null) {
     const dow = new Date(year, month, d).getDay();
     if (scheduledDays.includes(dow)) count++;
   }
-  return count;
+  return Math.max(0, count);
+}
+
+// Returns total number of scheduled days in the current month
+// (including future dates, but starting from streak creation date)
+function totalScheduledDaysInMonth(scheduledDays, createdAt = null) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  // Parse created_at into local parts
+  let startDay = 1;
+  if (createdAt) {
+    const raw = new Date(createdAt);
+    const cy = raw.getFullYear();
+    const cm = raw.getMonth();
+    const cd = raw.getDate();
+    if (cy === year && cm === month) {
+      startDay = cd;
+    } else if (cy > year || (cy === year && cm > month)) {
+      return 0; // created in the future
+    }
+    // created before this month → startDay stays 1
+  }
+
+  if (!scheduledDays || scheduledDays.length === 0) {
+    return Math.max(0, daysInMonth - startDay + 1);
+  }
+  let count = 0;
+  for (let d = startDay; d <= daysInMonth; d++) {
+    const dow = new Date(year, month, d).getDay();
+    if (scheduledDays.includes(dow)) count++;
+  }
+  return Math.max(0, count);
 }
 
 function getFlameColor(count) {
@@ -123,6 +158,15 @@ function getPriorityLabel(priority) {
     case "low":      return "LOW";
     default:         return "—";
   }
+}
+
+function localDateStr(isoStr) {
+  const d = new Date(isoStr);
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, "0"),
+    String(d.getDate()).padStart(2, "0"),
+  ].join("-");
 }
 
 function daysUntil(iso) {
@@ -243,8 +287,8 @@ function LifeScoreRing({ score, isComplete }) {
 // ── Streak Row ────────────────────────────────────────────────────────────────
 
 function StreakStatRow({ streak, checkedInDays }) {
-  const elapsed     = scheduledDaysElapsed(streak.scheduled_days, streak.created_at);
-  const consistency = elapsed > 0 ? Math.min(100, Math.round((checkedInDays / elapsed) * 100)) : 0;
+  const total       = totalScheduledDaysInMonth(streak.scheduled_days, streak.created_at);
+  const consistency = total > 0 ? Math.min(100, Math.round((checkedInDays / total) * 100)) : 0;
   const barColor = consistency === 100 ? "#c8f04c"
     : consistency >= 75 ? "#eab308"
     : consistency >= 50 ? "#f97316"
@@ -261,7 +305,7 @@ function StreakStatRow({ streak, checkedInDays }) {
           <div className="h-full rounded-full transition-all duration-700" style={{ width: `${consistency}%`, background: barColor }} />
         </div>
         <span className="font-mono text-[11px] w-8 text-right" style={{ color: barColor }}>{consistency}%</span>
-        <span className="font-mono text-[10px] text-white/25 w-14 text-right">{Math.min(checkedInDays, elapsed)}/{elapsed}d</span>
+        <span className="font-mono text-[10px] text-white/25 w-14 text-right">{checkedInDays}/{total}d</span>
         {consistency === 100 && <CheckCircle2 size={12} style={{ color: "#c8f04c" }} />}
       </div>
     </div>
@@ -374,13 +418,7 @@ export default function Stats() {
     const logs = streakLogs[s.id];
     let checkedIn = 0;
     if (logs) {
-      const c = new Date(s.created_at);
-      // Use local date parts to avoid UTC shift
-      const createdDateStr = [
-        c.getFullYear(),
-        String(c.getMonth() + 1).padStart(2, "0"),
-        String(c.getDate()).padStart(2, "0"),
-      ].join("-");
+      const createdDateStr = localDateStr(s.created_at);
       checkedIn = [...logs].filter(d => d >= createdDateStr).length;
     }
     const elapsed = scheduledDaysElapsed(s.scheduled_days, s.created_at);
@@ -521,17 +559,11 @@ export default function Stats() {
                 const logs = streakLogs[streak.id];
                 let checkedInDays = 0;
                 if (logs) {
-                  const c = new Date(streak.created_at);
-                  const createdDateStr = [
-                    c.getFullYear(),
-                    String(c.getMonth() + 1).padStart(2, "0"),
-                    String(c.getDate()).padStart(2, "0"),
-                  ].join("-");
-                  const elapsed = scheduledDaysElapsed(streak.scheduled_days, streak.created_at);
-                  checkedInDays = Math.min(
-                    [...logs].filter(d => d >= createdDateStr).length,
-                    elapsed
-                  );
+                  const createdDateStr = localDateStr(streak.created_at);
+                  const { monthName, year } = getMonthRange();
+                  const monthStr = `${year}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+                  // Count logs in the current month
+                  checkedInDays = [...logs].filter(d => d.startsWith(monthStr) && d >= createdDateStr).length;
                 }
                 return (
                   <StreakStatRow
