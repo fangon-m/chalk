@@ -483,15 +483,15 @@ export default function Stats() {
         {/* ── Daily Quote ── */}
         <div
           className="rounded-2xl border mb-4 px-6 py-5"
-          style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)", borderLeft: "2px solid rgba(200,240,76,0.25)" }}
+          style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)" }}
         >
           <p
             className="font-mono text-sm leading-relaxed mb-3"
-            style={{ color: "rgba(255,255,255,0.65)", fontStyle: "italic" }}
+            style={{ color: "rgba(255,255,255,0.40)", fontStyle: "italic" }}
           >
             "{dailyQuote.text}"
           </p>
-          <p className="font-mono text-[10px] tracking-widest" style={{ color: "rgba(200,240,76,0.5)" }}>
+          <p className="font-mono text-[10px] tracking-widest" style={{ color: "rgba(255,255,255,0.30)" }}>
             — {dailyQuote.author}
           </p>
         </div>
