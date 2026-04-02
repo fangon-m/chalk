@@ -1,4 +1,4 @@
-import { House, Map, Flame, BookOpen, BarChart2, LogOut } from "lucide-react";
+import { House, Map, Flame, BookOpen, BarChart2, Settings, LogOut } from "lucide-react";
 import logo from "../../res/logo.png";
 import { Link, useLocation } from "react-router-dom";
 import { useState } from "react";
@@ -81,6 +81,27 @@ export default function Sidebar() {
           })}
         </nav>
       </div>
+
+          
+      {/* Settings */}
+      <button
+        style={{
+          display: "flex", alignItems: "center",
+          marginTop: 350,
+          gap: expanded ? 14 : 0,
+          justifyContent: expanded ? "flex-start" : "center",
+          padding: "10px 12px", borderRadius: 8, cursor: "pointer",
+          background: "transparent", border: "1px solid transparent",
+          color: "#666", fontFamily: "DM Mono", fontSize: 14,
+          letterSpacing: "0.15em", width: "100%", transition: "all 0.2s ease",
+          whiteSpace: "nowrap", overflow: "hidden",
+        }}
+        onMouseEnter={e => { e.currentTarget.style.color = "#ffffff"; e.currentTarget.style.borderColor = "#ffffff21"; }}
+        onMouseLeave={e => { e.currentTarget.style.color = "#666"; e.currentTarget.style.borderColor = "transparent"; }}
+      >
+        <Settings size={15} style={{ flexShrink: 0 }} />
+        {expanded && <span style={{ marginLeft: 14 }}>Settings</span>}
+      </button>
 
       {/* Logout */}
       <button
