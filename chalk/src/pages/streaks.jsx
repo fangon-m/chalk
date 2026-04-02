@@ -172,7 +172,7 @@ function CalendarStrip({ logs, scheduledDays = null, createdAt = null }) {
       <div className="flex items-center gap-2 mb-2">
         <span className="font-mono text-[10px] tracking-widest text-white/25 uppercase">{monthName}</span>
         <span className="font-mono text-[10px] text-white/15">
-          {scheduledDates.filter(d => d.checked).length}/{scheduledDates.length} checked
+          {scheduledDates.filter(d => d.checked).length}/{scheduledDates.filter(d => !d.isFuture).length} checked
         </span>
       </div>
       <div className="flex flex-col gap-1">
@@ -587,10 +587,20 @@ export default function Streaks() {
         String(now.getMonth() + 1).padStart(2, "0"),
         String(now.getDate()).padStart(2, "0"),
       ].join("-");
+
+      // Run handle_missed_streaks once per day
       const lastRun = localStorage.getItem("chalk_missed_streaks_date");
       if (lastRun !== today) {
         await supabase.rpc("handle_missed_streaks");
         localStorage.setItem("chalk_missed_streaks_date", today);
+      }
+
+      // Recharge shields once per month (on the 1st)
+      const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const lastRecharge = localStorage.getItem("chalk_shield_recharge_month");
+      if (lastRecharge !== thisMonth) {
+        await supabase.rpc("recharge_shields");
+        localStorage.setItem("chalk_shield_recharge_month", thisMonth);
       }
 
       const data = await getStreaks();
