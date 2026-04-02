@@ -424,14 +424,19 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
               <Flame size={11} style={{ color: getFlameColor(streak.current_streak ?? 0) }} />
               <span className="font-mono text-[10px]">{streak.current_streak ?? 0} day{streak.current_streak !== 1 ? "s" : ""}</span>
             </div>
-            <div className="flex items-center gap-1 text-white/25">
+            <div className="flex items-center gap-1 text-white/15">
               <Zap size={10} />
               <span className="font-mono text-[10px]">best {streak.longest_streak ?? 0}</span>
             </div>
-            {streak.scheduled_days && streak.scheduled_days.length > 0 && (
+            {streak.scheduled_days && streak.scheduled_days.length > 0 ? (
               <div className="flex items-center gap-1">
-                <CalendarDays size={10} className="text-white/25" />
-                <span className="font-mono text-[10px] text-white/25">{formatSchedule(streak.scheduled_days)}</span>
+                <CalendarDays size={10} className="text-white/15" />
+                <span className="font-mono text-[10px] text-white/15">{formatSchedule(streak.scheduled_days)}</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1">
+                <CalendarDays size={10} className="text-white/15" />
+                <span className="font-mono text-[10px] text-white/15">Everyday</span>
               </div>
             )}
             <ShieldPips count={streak.shields ?? 0} />
