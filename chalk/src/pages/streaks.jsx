@@ -172,7 +172,7 @@ function CalendarStrip({ logs, scheduledDays = null, createdAt = null }) {
       <div className="flex items-center gap-2 mb-2">
         <span className="font-mono text-[10px] tracking-widest text-white/25 uppercase">{monthName}</span>
         <span className="font-mono text-[10px] text-white/15">
-          {scheduledDates.filter(d => d.checked).length}/{scheduledDates.filter(d => !d.isFuture).length} checked
+          {scheduledDates.filter(d => d.checked).length}/{scheduledDates.length} done
         </span>
       </div>
       <div className="flex flex-col gap-1">
