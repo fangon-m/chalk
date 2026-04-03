@@ -5,6 +5,7 @@ import Missions from "./pages/missions";
 import Streaks from "./pages/streaks";
 import Journals from "./pages/journals";
 import Stats from "./pages/stats";
+import Settings from "./pages/settings";
 import { Route, Routes } from "react-router-dom";
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/layout';
@@ -21,6 +22,7 @@ function App() {
         <Route path="/streaks" element={<Streaks />} />
         <Route path="/journals" element={<Journals />} />
         <Route path="/stats" element={<Stats />} />
+        <Route path="/settings" element={<Settings />} />
       </Route>
     </Routes>
   );
