@@ -53,17 +53,10 @@ const FONTS = [
   { label: "Courier", value: "'Courier New', monospace" },
 ];
 const FONT_SIZES = ["12px", "14px", "16px", "18px", "22px", "28px"];
-const THEMES = [
-  { label: "Dark",     bg: "#0d0d0d" }, { label: "Dim",      bg: "#181818" },
-  { label: "Gray",     bg: "#2a2a2a" }, { label: "Charcoal", bg: "#1a1a1a" },
-  { label: "White",    bg: "#f5f5f0" }, { label: "Beige",    bg: "#e8dcc8" },
-  { label: "Stone",    bg: "#d9d9d9" }, { label: "Ash",      bg: "#e0e0e0" },
-];
 const ZOOM_LEVELS = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
-const FOLDER_COLORS = ["#c8f04c","#60a5fa","#f97316","#ef4444","#a78bfa","#34d399","#f472b6","#fbbf24"];
 const FOLDER_ICONS  = ["folder","book","star","heart","sun","moon","flame","music"];
 
-const DEFAULT_TYPO = { font: "'DM Mono', monospace", size: "15px", theme: THEMES[0], zoom: 1.0 };
+const DEFAULT_TYPO = { font: "'DM Mono', monospace", size: "15px", zoom: 1.0 };
 const AUTOSAVE_DELAY = 2000;
 
 function randomQuote() { return JOURNAL_QUOTES[Math.floor(Math.random() * JOURNAL_QUOTES.length)]; }
@@ -155,8 +148,8 @@ async function moveJournalToFolder(journalId, folderId) {
 
 // ── Icon renderer ─────────────────────────────────────────────────────────────
 
-function FolderIcon({ icon, size = 14, color }) {
-  const props = { size, style: { color } };
+function FolderIcon({ icon, size = 14 }) {
+  const props = { size, style: { color: "rgba(255,255,255,0.6)" } };
   switch (icon) {
     case "book":  return <BookOpen {...props} />;
     case "star":  return <Star {...props} />;
@@ -184,12 +177,12 @@ function SectionLabel({ icon, label, count, color, action }) {
 
 // ── Save Indicator ────────────────────────────────────────────────────────────
 
-function SaveIndicator({ status, isLightTheme }) {
+function SaveIndicator({ status }) {
   const configs = {
-    idle:    { icon: <Cloud size={14} />,                            label: "All changes saved", color: isLightTheme ? "rgba(0,0,0,0.2)"  : "rgba(255,255,255,0.15)" },
-    unsaved: { icon: <CloudUpload size={14} />,                      label: "Unsaved changes",   color: isLightTheme ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.35)" },
-    saving:  { icon: <Loader2 size={14} className="animate-spin" />, label: "Saving…",           color: isLightTheme ? "rgba(0,0,0,0.3)"  : "rgba(255,255,255,0.3)"  },
-    saved:   { icon: <Cloud size={14} />,                            label: "Saved",             color: isLightTheme ? "#8b5a3c"          : "rgba(200,240,76,0.7)"   },
+    idle:    { icon: <Cloud size={14} />,                            label: "All changes saved", color: "rgba(255,255,255,0.15)" },
+    unsaved: { icon: <CloudUpload size={14} />,                      label: "Unsaved changes",   color: "rgba(255,255,255,0.35)" },
+    saving:  { icon: <Loader2 size={14} className="animate-spin" />, label: "Saving…",           color: "rgba(255,255,255,0.3)"  },
+    saved:   { icon: <Cloud size={14} />,                            label: "Saved",             color: "rgba(200,240,76,0.7)"   },
     error:   { icon: <CloudOff size={14} />,                         label: "Save failed",       color: "#ef4444" },
   };
   const cfg = configs[status];
@@ -204,92 +197,85 @@ function SaveIndicator({ status, isLightTheme }) {
 
 // ── Toolbar ───────────────────────────────────────────────────────────────────
 
-function ToolBtn({ onClick, active, title, children, isLightTheme }) {
+function ToolBtn({ onClick, active, title, children }) {
   return (
     <button onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); }} title={title}
       className="flex items-center justify-center rounded-md transition-all"
       style={{ width: 28, height: 28, flexShrink: 0, cursor: "pointer",
-        background: active ? isLightTheme ? "rgba(212,165,116,0.15)" : "rgba(200,240,76,0.15)" : "transparent",
-        color: active ? isLightTheme ? "#8b5a3c" : "#c8f04c" : isLightTheme ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.45)",
-        border: active ? isLightTheme ? "1px solid rgba(212,165,116,0.25)" : "1px solid rgba(200,240,76,0.25)" : "1px solid transparent",
+        background: active ? "rgba(200,240,76,0.15)" : "transparent",
+        color: active ? "#c8f04c" : "rgba(255,255,255,0.45)",
+        border: active ? "1px solid rgba(200,240,76,0.25)" : "1px solid transparent",
       }}>{children}</button>
   );
 }
-function ToolDivider({ isLightTheme }) { return <div style={{ width: 1, height: 18, background: isLightTheme ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.08)", margin: "0 2px", flexShrink: 0 }} />; }
+function ToolDivider() { return <div style={{ width: 1, height: 18, background: "rgba(255,255,255,0.08)", margin: "0 2px", flexShrink: 0 }} />; }
 
-function FontSelect({ typoFont, onTypoChange, editor, isLightTheme }) {
+function FontSelect({ typoFont, onTypoChange, editor }) {
   const active = editor?.getAttributes("fontFamily")?.fontFamily || typoFont;
   return (
     <select value={active} onMouseDown={(e) => e.stopPropagation()}
       onChange={(e) => { onTypoChange(e.target.value); editor?.chain().focus().setFontFamily(e.target.value).run(); }}
       className="font-mono text-[11px] rounded-md px-1 focus:outline-none cursor-pointer"
-      style={{ background: isLightTheme ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)", border: isLightTheme ? "1px solid rgba(0,0,0,0.1)" : "1px solid rgba(255,255,255,0.1)", color: isLightTheme ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.5)", height: 28, maxWidth: 80 }}>
+      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)", height: 28, maxWidth: 80 }}>
       {FONTS.map((f) => <option key={f.value} value={f.value} style={{ background: "#111" }}>{f.label}</option>)}
     </select>
   );
 }
 
-function FontSizeSelect({ typoSize, editor, isLightTheme }) {
+function FontSizeSelect({ typoSize, editor }) {
   const active = editor?.getAttributes("fontSize")?.fontSize || typoSize;
   return (
     <select value={active} onMouseDown={(e) => e.stopPropagation()}
       onChange={(e) => { editor?.chain().focus().setFontSize(e.target.value).run(); }}
       className="font-mono text-[11px] rounded-md px-1 focus:outline-none cursor-pointer"
-      style={{ background: isLightTheme ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)", border: isLightTheme ? "1px solid rgba(0,0,0,0.1)" : "1px solid rgba(255,255,255,0.1)", color: isLightTheme ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.5)", height: 28 }}>
+      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)", height: 28 }}>
       {FONT_SIZES.map((s) => <option key={s} value={s} style={{ background: "#111" }}>{s}</option>)}
     </select>
   );
 }
 
-function ZoomControl({ zoom, onZoomChange, isLightTheme }) {
+function ZoomControl({ zoom, onZoomChange }) {
   const idx = ZOOM_LEVELS.indexOf(zoom);
   return (
     <div className="flex items-center gap-0.5">
-      <ToolBtn onClick={() => idx > 0 && onZoomChange(ZOOM_LEVELS[idx - 1])} active={false} title="Zoom out" isLightTheme={isLightTheme}><span style={{ fontSize: 15, fontWeight: 400, lineHeight: 1, marginTop: -1 }}>−</span></ToolBtn>
-      <span className="font-mono text-[10px] tracking-widest text-center select-none" style={{ width: 36, color: isLightTheme ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.4)" }}>{Math.round(zoom * 100)}%</span>
-      <ToolBtn onClick={() => idx < ZOOM_LEVELS.length - 1 && onZoomChange(ZOOM_LEVELS[idx + 1])} active={false} title="Zoom in" isLightTheme={isLightTheme}><span style={{ fontSize: 15, fontWeight: 400, lineHeight: 1, marginTop: -1 }}>+</span></ToolBtn>
+      <ToolBtn onClick={() => idx > 0 && onZoomChange(ZOOM_LEVELS[idx - 1])} active={false} title="Zoom out"><span style={{ fontSize: 15, fontWeight: 400, lineHeight: 1, marginTop: -1 }}>−</span></ToolBtn>
+      <span className="font-mono text-[10px] tracking-widest text-center select-none" style={{ width: 36, color: "rgba(255,255,255,0.4)" }}>{Math.round(zoom * 100)}%</span>
+      <ToolBtn onClick={() => idx < ZOOM_LEVELS.length - 1 && onZoomChange(ZOOM_LEVELS[idx + 1])} active={false} title="Zoom in"><span style={{ fontSize: 15, fontWeight: 400, lineHeight: 1, marginTop: -1 }}>+</span></ToolBtn>
     </div>
   );
 }
 
-function FormattingBar({ editor, typo, onTypoChange, bgColor, isLightTheme }) {
+function FormattingBar({ editor, typo, onTypoChange }) {
   if (!editor) return null;
   return (
     <div className="sticky z-10 flex items-center gap-1 px-4 py-2 flex-wrap"
-      style={{ top: 57, background: bgColor, borderBottom: isLightTheme ? "1px solid rgba(0,0,0,0.1)" : "1px solid rgba(255,255,255,0.06)" }}>
-      <ToolBtn onClick={() => editor.chain().focus().undo().run()} active={false} title="Undo" isLightTheme={isLightTheme}><Undo size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().redo().run()} active={false} title="Redo" isLightTheme={isLightTheme}><Redo size={13} /></ToolBtn>
-      <ToolDivider isLightTheme={isLightTheme} />
-      <FontSelect typoFont={typo.font} onTypoChange={(v) => onTypoChange({ ...typo, font: v })} editor={editor} isLightTheme={isLightTheme} />
-      <FontSizeSelect typoSize={typo.size} editor={editor} isLightTheme={isLightTheme} />
-      <ToolDivider isLightTheme={isLightTheme} />
-      <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive("bold")} title="Bold" isLightTheme={isLightTheme}><Bold size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive("italic")} title="Italic" isLightTheme={isLightTheme}><Italic size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive("underline")} title="Underline" isLightTheme={isLightTheme}><UnderlineIcon size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive("code")} title="Code" isLightTheme={isLightTheme}><Code size={13} /></ToolBtn>
-      <ToolDivider isLightTheme={isLightTheme} />
-      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive("heading", { level: 1 })} title="H1" isLightTheme={isLightTheme}><Heading1 size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive("heading", { level: 2 })} title="H2" isLightTheme={isLightTheme}><Heading2 size={13} /></ToolBtn>
-      <ToolDivider isLightTheme={isLightTheme} />
-      <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive("bulletList")} title="Bullet" isLightTheme={isLightTheme}><List size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive("orderedList")} title="Numbered" isLightTheme={isLightTheme}><ListOrdered size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive("blockquote")} title="Quote" isLightTheme={isLightTheme}><Quote size={13} /></ToolBtn>
-      <ToolDivider isLightTheme={isLightTheme} />
-      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("left").run()} active={editor.isActive({ textAlign: "left" })} title="Left" isLightTheme={isLightTheme}><AlignLeft size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("center").run()} active={editor.isActive({ textAlign: "center" })} title="Center" isLightTheme={isLightTheme}><AlignCenter size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("right").run()} active={editor.isActive({ textAlign: "right" })} title="Right" isLightTheme={isLightTheme}><AlignRight size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("justify").run()} active={editor.isActive({ textAlign: "justify" })} title="Justify" isLightTheme={isLightTheme}><AlignJustify size={13} /></ToolBtn>
-      <ToolDivider isLightTheme={isLightTheme} />
-      <ToolBtn onClick={() => editor.chain().focus().setHorizontalRule().run()} active={false} title="Divider" isLightTheme={isLightTheme}><Minus size={13} /></ToolBtn>
-      <ToolDivider isLightTheme={isLightTheme} />
-      <div className="flex items-center gap-1 ml-1">
-        {THEMES.map((t) => (
-          <button key={t.label} onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onTypoChange({ ...typo, theme: t }); }} title={t.label} className="rounded-md transition-all"
-            style={{ width: 18, height: 18, background: t.bg, border: typo.theme.label === t.label ? isLightTheme ? "1.5px solid #8b5a3c" : "1.5px solid #c8f04c" : isLightTheme ? "1.5px solid rgba(0,0,0,0.25)" : "1.5px solid rgba(255,255,255,0.15)" }} />
-        ))}
-      </div>
-      <ToolDivider isLightTheme={isLightTheme} />
-      <ZoomControl zoom={typo.zoom} onZoomChange={(z) => onTypoChange({ ...typo, zoom: z })} isLightTheme={isLightTheme} />
+      style={{ top: 57, background: "#0d0d0d", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+      <ToolBtn onClick={() => editor.chain().focus().undo().run()} active={false} title="Undo"><Undo size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().redo().run()} active={false} title="Redo"><Redo size={13} /></ToolBtn>
+      <ToolDivider />
+      <FontSelect typoFont={typo.font} onTypoChange={(v) => onTypoChange({ ...typo, font: v })} editor={editor} />
+      <FontSizeSelect typoSize={typo.size} editor={editor} />
+      <ToolDivider />
+      <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive("bold")} title="Bold"><Bold size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive("italic")} title="Italic"><Italic size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive("underline")} title="Underline"><UnderlineIcon size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive("code")} title="Code"><Code size={13} /></ToolBtn>
+      <ToolDivider />
+      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive("heading", { level: 1 })} title="H1"><Heading1 size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive("heading", { level: 2 })} title="H2"><Heading2 size={13} /></ToolBtn>
+      <ToolDivider />
+      <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive("bulletList")} title="Bullet"><List size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive("orderedList")} title="Numbered"><ListOrdered size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive("blockquote")} title="Quote"><Quote size={13} /></ToolBtn>
+      <ToolDivider />
+      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("left").run()} active={editor.isActive({ textAlign: "left" })} title="Left"><AlignLeft size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("center").run()} active={editor.isActive({ textAlign: "center" })} title="Center"><AlignCenter size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("right").run()} active={editor.isActive({ textAlign: "right" })} title="Right"><AlignRight size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("justify").run()} active={editor.isActive({ textAlign: "justify" })} title="Justify"><AlignJustify size={13} /></ToolBtn>
+      <ToolDivider />
+      <ToolBtn onClick={() => editor.chain().focus().setHorizontalRule().run()} active={false} title="Divider"><Minus size={13} /></ToolBtn>
+      <ToolDivider />
+      <ZoomControl zoom={typo.zoom} onZoomChange={(z) => onTypoChange({ ...typo, zoom: z })} />
     </div>
   );
 }
@@ -328,7 +314,7 @@ function MoveToFolderModal({ journal, folders, onMove, onCancel }) {
           </button>
           {folders.map((folder) => (
             <button key={folder.id} onClick={() => onMove(folder.id)} className="w-full flex items-center px-5 py-3 hover:bg-white/5 transition-colors text-left cursor-pointer">
-              <div className="w-6 h-6 rounded flex items-center justify-center" style={{ background: `${folder.color}15` }}><FolderIcon icon={folder.icon} size={12} color={folder.color} /></div>
+              <div className="w-6 h-6 rounded flex items-center justify-center" style={{ background: "rgba(255,255,255,0.06)" }}><FolderIcon icon={folder.icon} size={12} /></div>
               <span className="font-mono text-xs text-white/70">{folder.name}</span>
               {journal.folder_id === folder.id && <span className="ml-auto font-mono text-[9px] text-white/25">current</span>}
             </button>
@@ -343,7 +329,7 @@ function MoveToFolderModal({ journal, folders, onMove, onCancel }) {
 
 function FolderModal({ folder, onClose, onSave }) {
   const isEdit = !!folder?.id;
-  const [form, setForm] = useState({ name: folder?.name || "", color: folder?.color || "#c8f04c", icon: folder?.icon || "folder" });
+  const [form, setForm] = useState({ name: folder?.name || "", icon: folder?.icon || "folder" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -373,50 +359,21 @@ function FolderModal({ folder, onClose, onSave }) {
             {error && <p className="font-mono text-[10px] text-red-400 mt-1">{error}</p>}
           </div>
           <div>
-            <label className="block font-mono text-[10px] tracking-widest text-white/40 uppercase mb-2">Color</label>
-            <div className="flex gap-2 flex-wrap items-center">
-              {FOLDER_COLORS.map((c) => (
-                <button key={c} onClick={() => setForm({ ...form, color: c })} className="w-7 h-7 rounded-lg transition-all cursor-pointer"
-                  style={{ background: c, outline: form.color === c ? `2px solid ${c}` : "none", outlineOffset: 2, opacity: form.color === c ? 1 : 0.5 }} />
-              ))}
-              {/* Custom color — same size as quick colors, opens native picker */}
-              <label
-                className="w-7 h-7 rounded-lg cursor-pointer relative transition-all flex items-center justify-center"
-                title="Custom color"
-                style={{
-                  background: FOLDER_COLORS.includes(form.color) ? "rgba(255,255,255,0.07)" : form.color,
-                  border: FOLDER_COLORS.includes(form.color) ? "1px dashed rgba(255,255,255,0.2)" : "none",
-                  outline: !FOLDER_COLORS.includes(form.color) ? `2px solid ${form.color}` : "none",
-                  outlineOffset: 2,
-                }}
-              >
-                <span style={{ fontSize: 14, lineHeight: 1, color: FOLDER_COLORS.includes(form.color) ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.5)", pointerEvents: "none" }}>+</span>
-                <input type="color" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })}
-                  style={{ position: "absolute", inset: 0, opacity: 0, width: "100%", height: "100%", cursor: "pointer", border: "none", padding: 0 }} />
-              </label>
-            </div>
-            {/* Current hex */}
-            <div className="flex items-center gap-1.5 mt-2">
-              <div className="w-3.5 h-3.5 rounded" style={{ background: form.color }} />
-              <span className="font-mono text-[10px] text-white/30">{form.color.toUpperCase()}</span>
-            </div>
-          </div>
-          <div>
             <label className="block font-mono text-[10px] tracking-widest text-white/40 uppercase mb-2">Icon</label>
             <div className="flex gap-2 flex-wrap">
               {FOLDER_ICONS.map((ic) => (
                 <button key={ic} onClick={() => setForm({ ...form, icon: ic })} className="w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer"
-                  style={{ background: form.icon === ic ? `${form.color}20` : "rgba(255,255,255,0.05)", border: form.icon === ic ? `1px solid ${form.color}50` : "1px solid rgba(255,255,255,0.08)" }}>
-                  <FolderIcon icon={ic} size={14} color={form.icon === ic ? form.color : "rgba(255,255,255,0.4)"} />
+                  style={{ background: form.icon === ic ? "rgba(200,240,76,0.15)" : "rgba(255,255,255,0.05)", border: form.icon === ic ? "1px solid rgba(200,240,76,0.3)" : "1px solid rgba(255,255,255,0.08)" }}>
+                  <FolderIcon icon={ic} size={14} />
                 </button>
               ))}
             </div>
           </div>
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: `${form.color}20` }}>
-              <FolderIcon icon={form.icon} size={14} color={form.color} />
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(200,240,76,0.1)" }}>
+              <FolderIcon icon={form.icon} size={14} />
             </div>
-            <span className="font-mono text-sm" style={{ color: form.color }}>{form.name || "Folder name"}</span>
+            <span className="font-mono text-sm" style={{ color: "rgba(255,255,255,0.7)" }}>{form.name || "Folder name"}</span>
           </div>
         </div>
         <div className="px-6 py-4 border-t border-white/8 flex justify-end gap-3">
@@ -499,63 +456,62 @@ function JournalEditor({ journal, onClose }) {
     else onClose();
   }
 
-  const isLightTheme = ["White", "Beige", "Stone", "Ash"].includes(typo.theme.label);
-  const textColor = isLightTheme ? "#2a2a2a" : "rgba(255,255,255,0.78)";
-  const headingColor = isLightTheme ? "#1a1a1a" : "rgba(255,255,255,0.95)";
-  const placeholderColor = isLightTheme ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.15)";
-  const caretColor = isLightTheme ? "#d4a574" : "#c8f04c";
-  const codeBackground = isLightTheme ? "rgba(212,165,116,0.1)" : "rgba(200,240,76,0.08)";
-  const codeColor = isLightTheme ? "#8b5a3c" : "#c8f04c";
-  const blockquoteColor = isLightTheme ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.4)";
-  const blockquoteBorder = isLightTheme ? "rgba(212,165,116,0.35)" : "rgba(200,240,76,0.35)";
+  const textColor = "rgba(255,255,255,0.78)";
+  const headingColor = "rgba(255,255,255,0.95)";
+  const placeholderColor = "rgba(255,255,255,0.15)";
+  const caretColor = "#c8f04c";
+  const codeBackground = "rgba(200,240,76,0.08)";
+  const codeColor = "#c8f04c";
+  const blockquoteColor = "rgba(255,255,255,0.4)";
+  const blockquoteBorder = "rgba(200,240,76,0.35)";
   const zoomCompensation = typo.zoom !== 1.0 ? `calc((${typo.zoom} - 1) * 60vh)` : undefined;
 
   return (
-    <div className="flex flex-col transition-colors duration-300" style={{ background: typo.theme.bg, minHeight: "100vh" }}>
+    <div className="flex flex-col" style={{ background: "#0d0d0d", minHeight: "100vh" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap');
-        .chalk-title { font-family: 'DM Mono', monospace !important; font-size: 1.5rem !important; color: ${isLightTheme ? "#2a2a2a" : "rgba(255,255,255,0.9)"} !important; }
+        .chalk-title { font-family: 'DM Mono', monospace !important; font-size: 1.5rem !important; color: rgba(255,255,255,0.9) !important; }
         .chalk-editor { font-family: ${typo.font}; font-size: ${typo.size}; line-height: 1.75; color: ${textColor}; caret-color: ${caretColor}; min-height: 60vh; }
         .chalk-editor > * + * { margin-top: 0.6em; }
         .chalk-editor p { margin: 0; }
         .chalk-editor h1 { font-size: 1.8em; font-weight: 500; color: ${headingColor}; line-height: 1.2; }
-        .chalk-editor h2 { font-size: 1.3em; font-weight: 500; color: ${isLightTheme ? "#1a1a1a" : "rgba(255,255,255,0.9)"}; }
+        .chalk-editor h2 { font-size: 1.3em; font-weight: 500; color: rgba(255,255,255,0.9); }
         .chalk-editor ul { padding-left: 1.4em; list-style: disc; }
         .chalk-editor ol { padding-left: 1.4em; list-style: decimal; }
         .chalk-editor li + li { margin-top: 0.2em; }
         .chalk-editor blockquote { border-left: 2px solid ${blockquoteBorder}; padding-left: 1em; color: ${blockquoteColor}; font-style: italic; }
-        .chalk-editor hr { border: none; border-top: 1px solid ${isLightTheme ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.08)"}; }
-        .chalk-editor pre { background: ${isLightTheme ? "rgba(0,0,0,0.02)" : "rgba(255,255,255,0.04)"}; border: 1px solid ${isLightTheme ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.07)"}; border-radius: 8px; padding: 1em; font-family: 'Courier New', monospace; font-size: 0.85em; }
+        .chalk-editor hr { border: none; border-top: 1px solid rgba(255,255,255,0.08); }
+        .chalk-editor pre { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 1em; font-family: 'Courier New', monospace; font-size: 0.85em; }
         .chalk-editor code { background: ${codeBackground}; color: ${codeColor}; border-radius: 4px; padding: 0.1em 0.4em; font-family: 'Courier New', monospace; font-size: 0.85em; }
-        .chalk-editor pre code { background: none; color: ${isLightTheme ? "#1a1a1a" : "rgba(255,255,255,0.7)"}; padding: 0; }
-        .chalk-editor strong { color: ${isLightTheme ? "#1a1a1a" : "rgba(255,255,255,0.95)"}; font-weight: 600; }
+        .chalk-editor pre code { background: none; color: rgba(255,255,255,0.7); padding: 0; }
+        .chalk-editor strong { color: rgba(255,255,255,0.95); font-weight: 600; }
         .chalk-editor em { font-style: italic; }
         .chalk-editor u { text-decoration: underline; text-underline-offset: 3px; }
         .chalk-editor .is-editor-empty:first-child::before, .chalk-editor .is-empty::before { content: attr(data-placeholder); color: ${placeholderColor}; pointer-events: none; float: left; height: 0; }
-        .chalk-editor ::selection { background: ${isLightTheme ? "rgba(212,165,116,0.2)" : "rgba(200,240,76,0.2)"}; }
+        .chalk-editor ::selection { background: rgba(200,240,76,0.2); }
       `}</style>
-      <div className="flex items-center px-6 py-4 border-b sticky top-0 z-20 transition-colors duration-300"
-        style={{ background: typo.theme.bg, borderColor: isLightTheme ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.06)", height: 57, gap: 16 }}>
+      <div className="flex items-center px-6 py-4 border-b sticky top-0 z-20"
+        style={{ background: "#0d0d0d", borderColor: "rgba(255,255,255,0.06)", height: 57, gap: 16 }}>
         <button onClick={handleBack} className="flex items-center gap-2 font-mono text-xs tracking-widest transition-colors shrink-0"
-          style={{ color: isLightTheme ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.35)" }}
-          onMouseEnter={e => e.currentTarget.style.color = isLightTheme ? "rgba(0,0,0,0.7)" : "rgba(255,255,255,0.7)"}
-          onMouseLeave={e => e.currentTarget.style.color = isLightTheme ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.35)"}>
+          style={{ color: "rgba(255,255,255,0.35)" }}
+          onMouseEnter={e => e.currentTarget.style.color = "rgba(255,255,255,0.7)"}
+          onMouseLeave={e => e.currentTarget.style.color = "rgba(255,255,255,0.35)"}>
           <ArrowLeft size={14} /> JOURNALS
         </button>
         <div style={{ flex: 1 }} />
-        <SaveIndicator status={saveStatus} isLightTheme={isLightTheme} />
+        <SaveIndicator status={saveStatus} />
       </div>
-      <FormattingBar editor={editor} typo={typo} onTypoChange={setTypo} bgColor={typo.theme.bg} isLightTheme={isLightTheme} />
+      <FormattingBar editor={editor} typo={typo} onTypoChange={setTypo} />
       <div className="max-w-2xl mx-auto w-full px-6 py-10"
         style={{ transform: `scale(${typo.zoom})`, transformOrigin: "top center", marginBottom: zoomCompensation }}>
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Entry title (optional)"
           className="chalk-title w-full bg-transparent focus:outline-none mb-6 border-none" style={{ caretColor }} />
         <div className="flex items-center gap-3 mb-8">
-          <div className="flex-1 h-px" style={{ background: isLightTheme ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.06)" }} />
-          <span className="font-mono text-[10px] tracking-widest uppercase" style={{ color: isLightTheme ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.2)" }}>
+          <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
+          <span className="font-mono text-[10px] tracking-widest uppercase" style={{ color: "rgba(255,255,255,0.2)" }}>
             {isEdit ? `Last edited ${formatDate(journal.updated_at)} · ${formatTime(journal.updated_at)}` : formatDate(new Date().toISOString())}
           </span>
-          <div className="flex-1 h-px" style={{ background: isLightTheme ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.06)" }} />
+          <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
         </div>
         <EditorContent editor={editor} />
       </div>
@@ -745,19 +701,19 @@ function FolderSection({ folder, journals, folders, onEdit, onSoftDelete, onDele
       {/* Folder header — same style as SectionLabel */}
       <div
         className="flex items-center gap-2 px-3 py-2 mb-3 group/folder rounded-xl transition-all"
-        style={{ background: isDragOver ? `${folder.color}10` : "transparent", border: isDragOver ? `1px solid ${folder.color}30` : "1px solid transparent" }}
+        style={{ background: isDragOver ? "rgba(200,240,76,0.1)" : "transparent", border: isDragOver ? "1px solid rgba(200,240,76,0.3)" : "1px solid transparent" }}
         onDragOver={(e) => { e.preventDefault(); onDragOver(folder.id); }}
         onDragLeave={onDragLeave}
         onDrop={(e) => { e.preventDefault(); onDrop(folder.id); }}
       >
         <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer">
           {open
-            ? <ChevronDown size={10} style={{ color: folder.color, opacity: 0.7, flexShrink: 0 }} />
-            : <ChevronRight size={10} style={{ color: folder.color, opacity: 0.7, flexShrink: 0 }} />
+            ? <ChevronDown size={10} className="text-white/40" />
+            : <ChevronRight size={10} className="text-white/40" />
           }
-          <FolderIcon icon={folder.icon} size={10} color={folder.color} />
-          <span className="font-mono text-[10px] tracking-widest uppercase truncate" style={{ color: folder.color }}>{folder.name}</span>
-          <span className="font-mono text-[10px]" style={{ color: `${folder.color}60` }}>{journals.length}</span>
+          <FolderIcon icon={folder.icon} size={10} />
+          <span className="font-mono text-[10px] tracking-widest uppercase truncate text-white/60">{folder.name}</span>
+          <span className="font-mono text-[10px] text-white/40">{journals.length}</span>
         </button>
         <div className="flex items-center gap-0.5 opacity-0 group-hover/folder:opacity-100 transition-opacity ml-auto">
           <button onClick={() => onEditFolder(folder)} className="p-1 rounded hover:bg-white/8 text-white/25 hover:text-white/60 transition-all cursor-pointer"><Pencil size={9} /></button>
@@ -769,7 +725,7 @@ function FolderSection({ folder, journals, folders, onEdit, onSoftDelete, onDele
         <div className="space-y-2 pl-3">
           {journals.length === 0 ? (
             <div className="rounded-xl border border-dashed px-4 py-6 text-center transition-all"
-              style={{ borderColor: isDragOver ? folder.color : "rgba(255,255,255,0.08)", background: isDragOver ? `${folder.color}05` : "transparent" }}
+              style={{ borderColor: isDragOver ? "rgba(200,240,76,0.3)" : "rgba(255,255,255,0.08)", background: isDragOver ? "rgba(200,240,76,0.05)" : "transparent" }}
               onDragOver={(e) => { e.preventDefault(); onDragOver(folder.id); }}
               onDragLeave={onDragLeave}
               onDrop={(e) => { e.preventDefault(); onDrop(folder.id); }}>
@@ -807,17 +763,17 @@ function DeletedFolderCard({ folder, journals, onRestoreFolder, onPermanentDelet
       <div className="rounded-2xl border border-white/6 overflow-hidden" style={{ background: "#0f0f0f" }}>
         {/* Folder row */}
         <div className="flex items-center gap-3 px-5 py-3 pl-6">
-          <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l" style={{ background: `${folder.color}30` }} />
+          <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l" style={{ background: "rgba(255,255,255,0.1)" }} />
           <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer">
             {open
-              ? <ChevronDown size={10} style={{ color: folder.color, opacity: 0.5, flexShrink: 0 }} />
-              : <ChevronRight size={10} style={{ color: folder.color, opacity: 0.5, flexShrink: 0 }} />
+              ? <ChevronDown size={10} className="text-white/40 shrink-0" />
+              : <ChevronRight size={10} className="text-white/40 shrink-0" />
             }
-            <div className="w-5 h-5 rounded flex items-center justify-center shrink-0" style={{ background: `${folder.color}15` }}>
-              <FolderIcon icon={folder.icon} size={10} color={folder.color} />
+            <div className="w-5 h-5 rounded flex items-center justify-center shrink-0" style={{ background: "rgba(255,255,255,0.05)" }}>
+              <FolderIcon icon={folder.icon} size={10} />
             </div>
-            <span className="font-mono text-sm truncate" style={{ color: `${folder.color}80` }}>{folder.name}</span>
-            <span className="font-mono text-[10px] ml-1" style={{ color: `${folder.color}40` }}>{journals.length} entries</span>
+            <span className="font-mono text-sm truncate text-white/70">{folder.name}</span>
+            <span className="font-mono text-[10px] ml-1 text-white/40">{journals.length} entries</span>
           </button>
           <div className="flex items-center gap-1 shrink-0">
             <button
