@@ -11,6 +11,7 @@ import {
 } from "../lib/streaks";
 import { recalculateMissionProgress } from "../lib/missions";
 import { getMissionIdsForStreak } from "../lib/streaks";
+import { useSettings } from "../context/SettingsContext.jsx";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -59,7 +60,7 @@ function getPriorityColor(priority) {
 
 // ── Day Picker ────────────────────────────────────────────────────────────────
 
-function DayPicker({ value, onChange }) {
+function DayPicker({ value, onChange, accentColor }) {
   const selected = value || [];
 
   function toggle(dow) {
@@ -86,9 +87,9 @@ function DayPicker({ value, onChange }) {
               onClick={() => toggle(day.value)}
               className="flex-1 py-1.5 rounded-lg font-mono text-[10px] tracking-wide transition-all cursor-pointer"
               style={{
-                background: active ? "rgba(200,240,76,0.15)" : "rgba(255,255,255,0.05)",
-                border: active ? "1px solid rgba(200,240,76,0.35)" : "1px solid rgba(255,255,255,0.08)",
-                color: active ? "#c8f04c" : "rgba(255,255,255,0.3)",
+                background: active ? `${accentColor}26` : "rgba(255,255,255,0.05)",
+                border: active ? `1px solid ${accentColor}59` : "1px solid rgba(255,255,255,0.08)",
+                color: active ? accentColor : "rgba(255,255,255,0.3)",
               }}
             >
               {day.label}
@@ -106,9 +107,8 @@ function DayPicker({ value, onChange }) {
 }
 
 // ── Calendar Strip ────────────────────────────────────────────────────────────
-// Shows only scheduled dates for the current month, grouped by week row
 
-function CalendarStrip({ logs, scheduledDays = null, createdAt = null }) {
+function CalendarStrip({ logs, scheduledDays = null, createdAt = null, accentColor }) {
   const checkedSet = new Set(logs.map(l => l.date));
   const today = new Date();
   const todayStr = [
@@ -121,7 +121,6 @@ function CalendarStrip({ logs, scheduledDays = null, createdAt = null }) {
   const month = today.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-  // Parse created date in local time — only show dates from creation onward
   let createdDateStr = null;
   if (createdAt) {
     const c = new Date(createdAt);
@@ -142,7 +141,6 @@ function CalendarStrip({ logs, scheduledDays = null, createdAt = null }) {
       String(d).padStart(2, "0"),
     ].join("-");
 
-    // Skip dates before streak was created
     if (createdDateStr && dateStr < createdDateStr) continue;
 
     const scheduled = !scheduledDays || scheduledDays.length === 0 || scheduledDays.includes(dow);
@@ -159,7 +157,6 @@ function CalendarStrip({ logs, scheduledDays = null, createdAt = null }) {
     }
   }
 
-  // Group into rows of 7 for display
   const rows = [];
   for (let i = 0; i < scheduledDates.length; i += 7) {
     rows.push(scheduledDates.slice(i, i + 7));
@@ -184,27 +181,25 @@ function CalendarStrip({ logs, scheduledDays = null, createdAt = null }) {
                 title={`${item.dateStr}${item.isToday ? " (today)" : ""}`}
                 className="flex flex-col items-center gap-0.5"
               >
-                {/* Day number */}
                 <span
                   className="font-mono leading-none"
                   style={{
                     fontSize: 8,
-                    color: item.isToday ? "#c8f04c" : "rgba(255,255,255,0.2)",
+                    color: item.isToday ? accentColor : "rgba(255,255,255,0.2)",
                     fontWeight: item.isToday ? "500" : "300",
                   }}
                 >
                   {item.day}
                 </span>
-                {/* Dot */}
                 <div
                   className="w-2.5 h-2.5 rounded-sm"
                   style={{
                     background: item.checked
-                      ? "#c8f04c"
+                      ? accentColor
                       : item.isFuture
                       ? "rgba(255,255,255,0.04)"
                       : "rgba(255,255,255,0.12)",
-                    outline: item.isToday ? "1.5px solid #c8f04c" : "none",
+                    outline: item.isToday ? `1.5px solid ${accentColor}` : "none",
                     outlineOffset: 1,
                   }}
                 />
@@ -328,7 +323,7 @@ function ConfirmModal({ message, onConfirm, onCancel }) {
 
 // ── Streak Card ───────────────────────────────────────────────────────────────
 
-function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
+function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn, accentColor }) {
   const [expanded, setExpanded] = useState(false);
   const [logs, setLogs] = useState(null);
   const [loadingLogs, setLoadingLogs] = useState(false);
@@ -336,7 +331,8 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
 
   const checkedToday   = streak._checkedToday ?? false;
   const scheduledToday = isScheduledToday(streak.scheduled_days);
-  const accentColor    = scheduledToday ? (streak.color || "#c8f04c") : "#6b7280";
+  // Use the global accent for scheduled streaks, gray for off-today
+  const cardAccent     = scheduledToday ? accentColor : "#6b7280";
 
   async function handleExpand() {
     const next = !expanded;
@@ -356,7 +352,7 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
       className="group relative rounded-2xl border border-white/8 transition-all duration-200 overflow-hidden hover:border-white/20"
       style={{ background: "#111", opacity: scheduledToday ? 1 : 0.5 }}
     >
-      <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-2xl" style={{ background: accentColor }} />
+      <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-2xl" style={{ background: cardAccent }} />
 
       <div className="px-5 py-4 pl-6">
         {/* Top row */}
@@ -367,15 +363,15 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
               disabled={!scheduledToday || checkedToday || checkingIn === streak.id}
               className="shrink-0 w-8 h-8 rounded-lg border flex items-center justify-center transition-all"
               style={{
-                background:  checkedToday ? `${accentColor}22` : "rgba(255,255,255,0.08)",
-                borderColor: checkedToday ? accentColor : "rgba(255,255,255,0.1)",
+                background:  checkedToday ? `${cardAccent}22` : "rgba(255,255,255,0.08)",
+                borderColor: checkedToday ? cardAccent : "rgba(255,255,255,0.1)",
                 cursor: (!scheduledToday || checkedToday) ? "default" : "pointer",
               }}
             >
               {checkingIn === streak.id ? (
-                <Loader2 size={14} className="animate-spin" style={{ color: accentColor }} />
+                <Loader2 size={14} className="animate-spin" style={{ color: cardAccent }} />
               ) : checkedToday ? (
-                <CheckCircle2 size={14} style={{ color: accentColor }} />
+                <CheckCircle2 size={14} style={{ color: cardAccent }} />
               ) : (
                 <Check size={13} style={{ color: scheduledToday ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.15)" }} />
               )}
@@ -386,7 +382,7 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
                 <h3 className="font-mono text-sm text-white">{streak.name}</h3>
                 {checkedToday && scheduledToday && (
                   <span className="text-[9px] font-mono tracking-widest border px-1.5 py-0.5 rounded"
-                    style={{ color: accentColor, borderColor: `${accentColor}40`, background: `${accentColor}10` }}>
+                    style={{ color: cardAccent, borderColor: `${cardAccent}40`, background: `${cardAccent}10` }}>
                     DONE
                   </span>
                 )}
@@ -420,17 +416,14 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
         {/* Stats footer */}
         <div className="flex items-center justify-between">
           <div className="flex items-center">
-            {/* Col 1: streak count — fixed 20 */}
             <div className="flex items-center gap-1 text-white/25" style={{ width: 80 }}>
               <Flame size={11} style={{ color: getFlameColor(streak.current_streak ?? 0), flexShrink: 0 }} />
               <span className="font-mono text-[10px] truncate">{streak.current_streak ?? 0} day{streak.current_streak !== 1 ? "s" : ""}</span>
             </div>
-            {/* Col 2: best */}
             <div className="flex items-center gap-1 text-white/25 -ml-2 mr-2" style={{ width: 72 }}>
               <Zap size={10} style={{ flexShrink: 0 }} />
               <span className="font-mono text-[10px] truncate">best {streak.longest_streak ?? 0}</span>
             </div>
-            {/* Col 3: schedule */}
             <div className="flex items-center gap-1" style={{ width: 88 }}>
               <CalendarDays size={10} className="text-white/25" style={{ flexShrink: 0 }} />
               <span className="font-mono text-[10px] text-white/25 truncate">
@@ -439,13 +432,14 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
                   : "Everyday"}
               </span>
             </div>
-            {/* Col 4: shields */}
             <div style={{ width: 52 }}>
               <ShieldPips count={streak.shields ?? 0} />
             </div>
           </div>
           <button onClick={handleExpand}
-            className="flex items-center gap-1 font-mono text-[10px] tracking-widest text-white/35 hover:text-[#c8f04c] transition-colors cursor-pointer">
+            className="flex items-center gap-1 font-mono text-[10px] tracking-widest text-white/35 transition-colors cursor-pointer"
+            onMouseEnter={e => e.currentTarget.style.color = accentColor}
+            onMouseLeave={e => e.currentTarget.style.color = "rgba(255,255,255,0.35)"}>
             {expanded ? "HIDE" : "HISTORY"} {expanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
           </button>
         </div>
@@ -461,7 +455,12 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
             ) : (
               <div className="flex gap-5">
                 <div className="shrink-0">
-                  <CalendarStrip logs={logs || []} scheduledDays={streak.scheduled_days} createdAt={streak.created_at} />
+                  <CalendarStrip
+                    logs={logs || []}
+                    scheduledDays={streak.scheduled_days}
+                    createdAt={streak.created_at}
+                    accentColor={accentColor}
+                  />
                 </div>
                 <div className="w-px self-stretch shrink-0" style={{ background: "rgba(255,255,255,0.06)" }} />
                 <div className="flex-1 min-w-0">
@@ -490,7 +489,7 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn }) {
 
 // ── Add / Edit Modal ──────────────────────────────────────────────────────────
 
-function StreakModal({ streak, onClose, onSave }) {
+function StreakModal({ streak, onClose, onSave, accentColor }) {
   const isEdit = !!streak?.id;
   const [form, setForm] = useState({
     name:           streak?.name           || "",
@@ -537,7 +536,10 @@ function StreakModal({ streak, onClose, onSave }) {
             <input value={form.name}
               onChange={(e) => { setForm({ ...form, name: e.target.value }); setError(""); }}
               placeholder="What habit are you building?"
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 font-mono focus:outline-none transition-colors"
+              style={{ borderColor: "rgba(255,255,255,0.1)" }}
+              onFocus={e => e.target.style.borderColor = `${accentColor}80`}
+              onBlur={e => e.target.style.borderColor = "rgba(255,255,255,0.1)"}
             />
             {error && <p className="font-mono text-[10px] text-red-400 mt-1">{error}</p>}
           </div>
@@ -547,13 +549,17 @@ function StreakModal({ streak, onClose, onSave }) {
             <input value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               placeholder="Brief context..."
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 font-mono focus:outline-none transition-colors"
+              style={{ borderColor: "rgba(255,255,255,0.1)" }}
+              onFocus={e => e.target.style.borderColor = `${accentColor}80`}
+              onBlur={e => e.target.style.borderColor = "rgba(255,255,255,0.1)"}
             />
           </div>
 
           <DayPicker
             value={form.scheduled_days}
             onChange={(v) => setForm({ ...form, scheduled_days: v })}
+            accentColor={accentColor}
           />
         </div>
 
@@ -564,7 +570,7 @@ function StreakModal({ streak, onClose, onSave }) {
           </button>
           <button onClick={handleSubmit} disabled={saving || !form.name.trim()}
             className="px-5 py-2 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
-            style={{ background: form.name.trim() ? "#c8f04c" : "#444", color: "#0d0d0d" }}>
+            style={{ background: form.name.trim() ? accentColor : "#444", color: "#0d0d0d" }}>
             {saving && <Loader2 size={12} className="animate-spin" />}
             {isEdit ? "SAVE CHANGES" : "CREATE STREAK"}
           </button>
@@ -577,6 +583,8 @@ function StreakModal({ streak, onClose, onSave }) {
 // ── Main Streaks Page ─────────────────────────────────────────────────────────
 
 export default function Streaks() {
+  const { accentColor } = useSettings();
+
   const [streaks, setStreaks]             = useState([]);
   const [loading, setLoading]             = useState(true);
   const [pageError, setPageError]         = useState("");
@@ -596,14 +604,12 @@ export default function Streaks() {
         String(now.getDate()).padStart(2, "0"),
       ].join("-");
 
-      // Run handle_missed_streaks once per day
       const lastRun = localStorage.getItem("chalk_missed_streaks_date");
       if (lastRun !== today) {
         await supabase.rpc("handle_missed_streaks");
         localStorage.setItem("chalk_missed_streaks_date", today);
       }
 
-      // Recharge shields once per month (on the 1st)
       const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
       const lastRecharge = localStorage.getItem("chalk_shield_recharge_month");
       if (lastRecharge !== thisMonth) {
@@ -658,7 +664,7 @@ export default function Streaks() {
     }
   }
 
-  const enriched      = streaks.map((s) => ({ ...s, _checkedToday: !!todayMap[s.id] }));
+  const enriched       = streaks.map((s) => ({ ...s, _checkedToday: !!todayMap[s.id] }));
   const scheduledToday = enriched.filter(s => isScheduledToday(s.scheduled_days));
   const doneCount      = scheduledToday.filter(s => s._checkedToday).length;
   const totalCount     = streaks.length;
@@ -696,18 +702,18 @@ export default function Streaks() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <Flame size={14} className="text-[#c8f04c]" />
+              <Flame size={14} style={{ color: accentColor }} />
               <span className="font-mono text-[11px] tracking-widest text-white/30 uppercase">Chalk / Streaks</span>
             </div>
             <h1 className="text-2xl font-mono text-white">
               Streaks
-              <span className="ml-2 text-sm" style={{ color: "#c8f04c" }}>{totalCount}</span>
+              <span className="ml-2 text-sm" style={{ color: accentColor }}>{totalCount}</span>
             </h1>
           </div>
           <button
             onClick={() => { setEditingStreak(null); setShowModal(true); }}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs tracking-widest transition-all hover:opacity-90 active:scale-95 cursor-pointer"
-            style={{ background: "#c8f04c", color: "#0d0d0d", fontWeight: "500" }}
+            style={{ background: accentColor, color: "#0d0d0d", fontWeight: "500" }}
           >
             <Plus size={13} /> NEW STREAK
           </button>
@@ -718,12 +724,18 @@ export default function Streaks() {
             <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: "#111" }}>
               <button onClick={() => setTab("active")}
                 className="px-4 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all cursor-pointer"
-                style={{ background: tab === "active" ? "#c8f04c" : "transparent", color: tab === "active" ? "#0d0d0d" : "rgba(255,255,255,0.3)" }}>
+                style={{
+                  background: tab === "active" ? accentColor : "transparent",
+                  color: tab === "active" ? "#0d0d0d" : "rgba(255,255,255,0.3)",
+                }}>
                 PENDING
               </button>
               <button onClick={() => setTab("done")}
                 className="px-4 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all cursor-pointer"
-                style={{ background: tab === "done" ? "#c8f04c" : "transparent", color: tab === "done" ? "#0d0d0d" : "rgba(255,255,255,0.3)" }}>
+                style={{
+                  background: tab === "done" ? accentColor : "transparent",
+                  color: tab === "done" ? "#0d0d0d" : "rgba(255,255,255,0.3)",
+                }}>
                 DONE TODAY
               </button>
             </div>
@@ -750,7 +762,7 @@ export default function Streaks() {
             <p className="font-mono text-white/15 text-xs mb-6">Start building daily habits</p>
             <button onClick={() => { setEditingStreak(null); setShowModal(true); }}
               className="px-5 py-2.5 rounded-xl font-mono text-xs tracking-widest cursor-pointer"
-              style={{ background: "#c8f04c", color: "#0d0d0d" }}>
+              style={{ background: accentColor, color: "#0d0d0d" }}>
               GET STARTED
             </button>
           </div>
@@ -773,6 +785,7 @@ export default function Streaks() {
                 onEdit={(s) => { setEditingStreak(s); setShowModal(true); }}
                 onDelete={handleDelete}
                 checkingIn={checkingIn}
+                accentColor={accentColor}
               />
             ))}
           </div>
@@ -793,6 +806,7 @@ export default function Streaks() {
           streak={editingStreak}
           onClose={() => { setShowModal(false); setEditingStreak(null); }}
           onSave={() => { setShowModal(false); setEditingStreak(null); load(); }}
+          accentColor={accentColor}
         />
       )}
     </div>
