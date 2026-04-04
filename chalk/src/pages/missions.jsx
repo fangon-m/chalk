@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Plus, Map, ChevronRight, ChevronDown, GripVertical, Flame,
   Calendar, X, Milestone, ArrowLeft, Pencil, Trash2, Search, Check, Link2, Loader2 as Loader,
@@ -10,6 +10,7 @@ import {
   recalculateMissionProgress,
 } from "../lib/missions";
 import { getStreaks, createStreak } from "../lib/streaks";
+import { useSettings } from "../context/SettingsContext.jsx";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -382,7 +383,6 @@ function MissionModal({ mission, onClose, onSave, streaks, missions, onStreakCre
                 <label className="font-mono text-[10px] tracking-widest text-white/40 uppercase">
                   Milestones
                 </label>
-                {/* REQUIRED only shows after a submit attempt with no milestones */}
                 {submitted && !hasAtLeastOneMilestone && (
                   <span className="font-mono text-[9px] text-red-400/70 tracking-widest">REQUIRED</span>
                 )}
@@ -395,7 +395,6 @@ function MissionModal({ mission, onClose, onSave, streaks, missions, onStreakCre
               </button>
             </div>
 
-            {/* Error banner — only after submit attempt */}
             {submitted && milestoneError && form.milestones.length === 0 && (
               <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-red-400/20 bg-red-400/5 mb-3">
                 <span className="font-mono text-[10px] text-red-400/80">{milestoneError}</span>
@@ -711,7 +710,7 @@ function RoadmapView({ mission, onBack, onUpdate, allStreaks }) {
 
 // ── Mission Card ──────────────────────────────────────────────────────────────
 
-function MissionCard({ mission, index, onSelect, onEdit, onDelete, dragging, onDragStart, onDragEnd, onDragOver }) {
+function MissionCard({ mission, index, onSelect, onEdit, onDelete, dragging, onDragStart, onDragEnd, onDragOver, accentColor }) {
   const [showConfirm, setShowConfirm] = useState(false);
 
   return (
@@ -727,7 +726,7 @@ function MissionCard({ mission, index, onSelect, onEdit, onDelete, dragging, onD
     >
       <div
         className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-2xl"
-        style={{ background: mission.priority === 1 ? "#c8f04c" : mission.priority === 2 ? "#f59e0b" : "rgba(255,255,255,0.15)" }}
+        style={{ background: mission.priority === 1 ? accentColor : mission.priority === 2 ? "#f59e0b" : "rgba(255,255,255,0.15)" }}
       />
       <div className="px-5 py-4 pl-6">
         <div className="flex items-start justify-between mb-3">
@@ -771,7 +770,10 @@ function MissionCard({ mission, index, onSelect, onEdit, onDelete, dragging, onD
           )}
           <button
             onClick={(e) => { e.stopPropagation(); onSelect(mission); }}
-            className="flex items-center justify-end gap-1 font-mono text-[10px] tracking-widest text-white/35 hover:text-[#c8f04c] transition-colors"
+            className="flex items-center justify-end gap-1 font-mono text-[10px] tracking-widest text-white/35 transition-colors"
+            style={{}}
+            onMouseEnter={e => e.currentTarget.style.color = accentColor}
+            onMouseLeave={e => e.currentTarget.style.color = "rgba(255,255,255,0.35)"}
           >
             ROADMAP <ChevronRight size={10} />
           </button>
@@ -810,6 +812,8 @@ function ConfirmModal({ message, onConfirm, onCancel }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function Missions() {
+  const { accentColor } = useSettings();
+
   const [missions, setMissions] = useState([]);
   const [streaks, setStreaks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -934,18 +938,18 @@ export default function Missions() {
             <div className="flex items-center justify-between mb-8">
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <Map size={14} className="text-[#c8f04c]" />
+                  <Map size={14} style={{ color: accentColor }} />
                   <span className="font-mono text-[11px] tracking-widest text-white/30 uppercase">Chalk / Missions</span>
                 </div>
                 <h1 className="text-2xl font-mono text-white">
                   Missions
-                  <span className="ml-2 text-sm" style={{ color: "#c8f04c" }}>{missions.length}</span>
+                  <span className="ml-2 text-sm" style={{ color: accentColor }}>{missions.length}</span>
                 </h1>
               </div>
               <button
                 onClick={() => { setEditingMission(null); setModalOpen(true); }}
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs tracking-widest transition-all hover:opacity-90 active:scale-95 cursor-pointer"
-                style={{ background: "#c8f04c", color: "#0d0d0d", fontWeight: "500", cursor: "pointer" }}
+                style={{ background: accentColor, color: "#0d0d0d", fontWeight: "500" }}
               >
                 <Plus size={13} /> NEW MISSION
               </button>
@@ -956,15 +960,21 @@ export default function Missions() {
                 <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: "#111" }}>
                   <button
                     onClick={() => setTab("active")}
-                    className="px-4 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all"
-                    style={{ background: tab === "active" ? "#c8f04c" : "transparent", color: tab === "active" ? "#0d0d0d" : "rgba(255,255,255,0.3)", cursor: "pointer" }}
+                    className="px-4 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all cursor-pointer"
+                    style={{
+                      background: tab === "active" ? accentColor : "transparent",
+                      color: tab === "active" ? "#0d0d0d" : "rgba(255,255,255,0.3)",
+                    }}
                   >
                     IN PROGRESS
                   </button>
                   <button
                     onClick={() => setTab("done")}
-                    className="px-4 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all"
-                    style={{ background: tab === "done" ? "#c8f04c" : "transparent", color: tab === "done" ? "#0d0d0d" : "rgba(255,255,255,0.3)", cursor: "pointer" }}
+                    className="px-4 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all cursor-pointer"
+                    style={{
+                      background: tab === "done" ? accentColor : "transparent",
+                      color: tab === "done" ? "#0d0d0d" : "rgba(255,255,255,0.3)",
+                    }}
                   >
                     FINISHED
                   </button>
@@ -978,14 +988,14 @@ export default function Missions() {
             {missions.length === 0 ? (
               <div className="text-center py-24">
                 <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/8" style={{ background: "#111" }}>
-                  <Target size={22} className="text-white/20" />
+                  <Map size={22} className="text-white/20" />
                 </div>
                 <p className="font-mono text-white/30 text-sm mb-1">No missions yet</p>
                 <p className="font-mono text-white/15 text-xs mb-6">Define what you're pursuing</p>
                 <button
                   onClick={() => { setEditingMission(null); setModalOpen(true); }}
-                  className="px-5 py-2.5 rounded-xl font-mono text-xs tracking-widest"
-                  style={{ background: "#c8f04c", color: "#0d0d0d", cursor: "pointer" }}
+                  className="px-5 py-2.5 rounded-xl font-mono text-xs tracking-widest cursor-pointer"
+                  style={{ background: accentColor, color: "#0d0d0d" }}
                 >
                   GET STARTED
                 </button>
@@ -1011,6 +1021,7 @@ export default function Missions() {
                       onDragStart={setDragIdx}
                       onDragEnd={handleDragEnd}
                       onDragOver={handleDragOver}
+                      accentColor={accentColor}
                     />
                   ))}
               </div>
