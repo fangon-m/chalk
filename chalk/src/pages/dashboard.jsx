@@ -7,6 +7,7 @@ import {
 import { supabase } from "../lib/supabase";
 import { checkInStreak, getMissionIdsForStreak } from "../lib/streaks";
 import { recalculateMissionProgress } from "../lib/missions";
+import { useSettings } from "../context/SettingsContext.jsx";
 
 // ── Daily Quote ───────────────────────────────────────────────────────────────
 
@@ -106,7 +107,7 @@ function LifeScoreRing({ score, isComplete }) {
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         {isComplete ? (
-          <Award size={24} style={{ color: "#c8f04c" }} />
+          <Award size={24} style={{ color: accentColor }} />
         ) : (
           <>
             <span className="font-mono text-2xl font-medium text-white">{score}</span>
@@ -156,6 +157,8 @@ export default function Dashboard() {
 
   const today = new Date().toISOString().slice(0, 10);
   const dailyQuote = getDailyQuote();
+
+  const { accentColor } = useSettings();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -247,7 +250,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <House size={14} className="text-[#c8f04c]" />
+              <House size={14} style={{color: accentColor}} />
               <span className="font-mono text-[11px] tracking-widest text-white/30 uppercase">Chalk / Home</span>
             </div>
             <h1 className="text-2xl font-mono text-white">Dashboard</h1>
@@ -289,8 +292,8 @@ export default function Dashboard() {
               {isComplete && (
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
                   style={{ background: "rgba(200,240,76,0.08)", border: "1px solid rgba(200,240,76,0.2)" }}>
-                  <Award size={12} style={{ color: "#c8f04c" }} />
-                  <span className="font-mono text-[10px] tracking-widest mt-0.5" style={{ color: "#c8f04c" }}>PERFECT DAY</span>
+                  <Award size={12} style={{ color: accentColor }} />
+                  <span className="font-mono text-[10px] tracking-widest mt-0.5" style={{ color: accentColor }}>PERFECT DAY</span>
                 </div>
               )}
             </div>
@@ -303,7 +306,7 @@ export default function Dashboard() {
                     <span className="font-mono text-[10px] text-white/40">{checkedInCount}/{totalScheduled}</span>
                   </div>
                   <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
-                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${lifeScore}%`, background: "#c8f04c" }} />
+                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${lifeScore}%`, background: accentColor }} />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -313,7 +316,7 @@ export default function Dashboard() {
                   </div>
                   <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
                     <p className="font-mono text-[9px] tracking-widest text-white/25 uppercase mb-1">Done</p>
-                    <p className="font-mono text-xl" style={{ color: "#c8f04c" }}>{doneCount}</p>
+                    <p className="font-mono text-xl" style={{ color: accentColor }}>{doneCount}</p>
                   </div>
                 </div>
                 {totalScheduled === 0 && allStreaks.length > 0 && (
@@ -368,9 +371,9 @@ export default function Dashboard() {
                         }}
                       >
                         {spinning ? (
-                          <Loader2 size={11} className="animate-spin" style={{ color: "#c8f04c" }} />
+                          <Loader2 size={11} className="animate-spin" style={{ color: accentColor }} />
                         ) : done ? (
-                          <CheckCircle2 size={12} style={{ color: "#c8f04c" }} />
+                          <CheckCircle2 size={12} style={{ color: accentColor }} />
                         ) : (
                           <Check size={11} className="text-white/30" />
                         )}
