@@ -16,13 +16,14 @@ import { useSettings } from "../context/SettingsContext.jsx";
 
 function ProgressBar({ value, size = "md" }) {
   const h = size === "sm" ? "h-1" : "h-1.5";
+  const { accentColor } = useSettings();
   return (
     <div className={`w-full bg-white/10 rounded-full ${h} overflow-hidden`}>
       <div
         className={`${h} rounded-full transition-all duration-700`}
         style={{
           width: `${value}%`,
-          background: `linear-gradient(90deg, #c8f04c, #a8d630)`,
+          background: accentColor,
           boxShadow: value > 0 ? "0 0 8px rgba(200,240,76,0.4)" : "none",
         }}
       />
@@ -724,10 +725,6 @@ function MissionCard({ mission, index, onSelect, onEdit, onDelete, dragging, onD
       }`}
       style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)" }}
     >
-      <div
-        className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-2xl"
-        style={{ background: mission.priority === 1 ? accentColor : mission.priority === 2 ? "#f59e0b" : "rgba(255,255,255,0.15)" }}
-      />
       <div className="px-5 py-4 pl-6">
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-start gap-3 flex-1 min-w-0">
