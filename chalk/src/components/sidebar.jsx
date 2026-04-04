@@ -3,6 +3,7 @@ import logo from "../../res/logo.png";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
+import { useSettings } from "../context/SettingsContext.jsx";
 
 const navItems = [
   { label: "Home",     icon: House,     path: "/dashboard" },
@@ -16,6 +17,7 @@ export default function Sidebar() {
   const [expanded, setExpanded] = useState(false);
   const location  = useLocation();
   const navigate  = useNavigate();
+  const { accentColor } = useSettings();
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -69,7 +71,7 @@ export default function Sidebar() {
                     gap: expanded ? 14 : 0,
                     padding: "10px 12px", borderRadius: 8, cursor: "pointer",
                     background: isActive ? "#1a1a1a" : "transparent",
-                    color: isActive ? "#c8f04c" : "#ffffff99",
+                    color: isActive ? accentColor : "#ffffff99",
                     transition: "all 0.2s ease",
                     fontFamily: "DM Mono", fontSize: 14, letterSpacing: "0.15em",
                     border: isActive ? "1px solid #232323" : "1px solid transparent",
@@ -100,7 +102,7 @@ export default function Sidebar() {
               padding: "10px 12px", borderRadius: 8, cursor: "pointer",
               background: isSettings ? "#1a1a1a" : "transparent",
               border: isSettings ? "1px solid #232323" : "1px solid transparent",
-              color: isSettings ? "#c8f04c" : "#666",
+              color: isSettings ? accentColor : "#666",
               fontFamily: "DM Mono", fontSize: 14,
               letterSpacing: "0.15em", width: "100%", transition: "all 0.2s ease",
               whiteSpace: "nowrap", overflow: "hidden",
