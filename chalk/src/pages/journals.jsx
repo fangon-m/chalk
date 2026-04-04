@@ -16,6 +16,7 @@ import TextAlign from "@tiptap/extension-text-align";
 import Underline from "@tiptap/extension-underline";
 import { supabase } from "../lib/supabase";
 import { createJournal, updateJournal } from "../lib/journals";
+import { useSettings } from "../context/SettingsContext.jsx";
 
 // ── Custom marks ──────────────────────────────────────────────────────────────
 
@@ -124,7 +125,6 @@ async function updateFolder(id, form) {
 }
 
 async function softDeleteFolder(id) {
-  // Soft-delete the folder — journals keep their folder_id so they restore with it
   const { error } = await supabase.from("journal_folders").update({ deleted_at: new Date().toISOString() }).eq("id", id);
   if (error) throw error;
 }
@@ -135,7 +135,6 @@ async function restoreFolder(id) {
 }
 
 async function permanentDeleteFolder(id) {
-  // Orphan journals first so they don't disappear, then hard delete
   await supabase.from("journals").update({ folder_id: null }).eq("folder_id", id);
   const { error } = await supabase.from("journal_folders").delete().eq("id", id);
   if (error) throw error;
@@ -162,7 +161,7 @@ function FolderIcon({ icon, size = 14 }) {
   }
 }
 
-// ── Section label (matches UNCATEGORIZED style) ───────────────────────────────
+// ── Section label ─────────────────────────────────────────────────────────────
 
 function SectionLabel({ icon, label, count, color, action }) {
   return (
@@ -177,13 +176,13 @@ function SectionLabel({ icon, label, count, color, action }) {
 
 // ── Save Indicator ────────────────────────────────────────────────────────────
 
-function SaveIndicator({ status }) {
+function SaveIndicator({ status, accentColor }) {
   const configs = {
     idle:    { icon: <Cloud size={14} />,                            label: "All changes saved", color: "rgba(255,255,255,0.15)" },
     unsaved: { icon: <CloudUpload size={14} />,                      label: "Unsaved changes",   color: "rgba(255,255,255,0.35)" },
     saving:  { icon: <Loader2 size={14} className="animate-spin" />, label: "Saving…",           color: "rgba(255,255,255,0.3)"  },
-    saved:   { icon: <Cloud size={14} />,                            label: "Saved",             color: "rgba(200,240,76,0.7)"   },
-    error:   { icon: <CloudOff size={14} />,                         label: "Save failed",       color: "#ef4444" },
+    saved:   { icon: <Cloud size={14} />,                            label: "Saved",             color: `${accentColor}b3`       },
+    error:   { icon: <CloudOff size={14} />,                         label: "Save failed",       color: "#ef4444"                },
   };
   const cfg = configs[status];
   if (!cfg) return null;
@@ -197,17 +196,24 @@ function SaveIndicator({ status }) {
 
 // ── Toolbar ───────────────────────────────────────────────────────────────────
 
-function ToolBtn({ onClick, active, title, children }) {
+function ToolBtn({ onClick, active, title, children, accentColor }) {
   return (
-    <button onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); }} title={title}
+    <button
+      onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); }}
+      title={title}
       className="flex items-center justify-center rounded-md transition-all"
-      style={{ width: 28, height: 28, flexShrink: 0, cursor: "pointer",
-        background: active ? "rgba(200,240,76,0.15)" : "transparent",
-        color: active ? "#c8f04c" : "rgba(255,255,255,0.45)",
-        border: active ? "1px solid rgba(200,240,76,0.25)" : "1px solid transparent",
-      }}>{children}</button>
+      style={{
+        width: 28, height: 28, flexShrink: 0, cursor: "pointer",
+        background: active ? `${accentColor}26` : "transparent",
+        color: active ? accentColor : "rgba(255,255,255,0.45)",
+        border: active ? `1px solid ${accentColor}40` : "1px solid transparent",
+      }}
+    >
+      {children}
+    </button>
   );
 }
+
 function ToolDivider() { return <div style={{ width: 1, height: 18, background: "rgba(255,255,255,0.08)", margin: "0 2px", flexShrink: 0 }} />; }
 
 function FontSelect({ typoFont, onTypoChange, editor }) {
@@ -234,48 +240,52 @@ function FontSizeSelect({ typoSize, editor }) {
   );
 }
 
-function ZoomControl({ zoom, onZoomChange }) {
+function ZoomControl({ zoom, onZoomChange, accentColor }) {
   const idx = ZOOM_LEVELS.indexOf(zoom);
   return (
     <div className="flex items-center gap-0.5">
-      <ToolBtn onClick={() => idx > 0 && onZoomChange(ZOOM_LEVELS[idx - 1])} active={false} title="Zoom out"><span style={{ fontSize: 15, fontWeight: 400, lineHeight: 1, marginTop: -1 }}>−</span></ToolBtn>
+      <ToolBtn onClick={() => idx > 0 && onZoomChange(ZOOM_LEVELS[idx - 1])} active={false} title="Zoom out" accentColor={accentColor}>
+        <span style={{ fontSize: 15, fontWeight: 400, lineHeight: 1, marginTop: -1 }}>−</span>
+      </ToolBtn>
       <span className="font-mono text-[10px] tracking-widest text-center select-none" style={{ width: 36, color: "rgba(255,255,255,0.4)" }}>{Math.round(zoom * 100)}%</span>
-      <ToolBtn onClick={() => idx < ZOOM_LEVELS.length - 1 && onZoomChange(ZOOM_LEVELS[idx + 1])} active={false} title="Zoom in"><span style={{ fontSize: 15, fontWeight: 400, lineHeight: 1, marginTop: -1 }}>+</span></ToolBtn>
+      <ToolBtn onClick={() => idx < ZOOM_LEVELS.length - 1 && onZoomChange(ZOOM_LEVELS[idx + 1])} active={false} title="Zoom in" accentColor={accentColor}>
+        <span style={{ fontSize: 15, fontWeight: 400, lineHeight: 1, marginTop: -1 }}>+</span>
+      </ToolBtn>
     </div>
   );
 }
 
-function FormattingBar({ editor, typo, onTypoChange }) {
+function FormattingBar({ editor, typo, onTypoChange, accentColor }) {
   if (!editor) return null;
   return (
     <div className="sticky z-10 flex items-center gap-1 px-4 py-2 flex-wrap"
       style={{ top: 57, background: "#0d0d0d", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-      <ToolBtn onClick={() => editor.chain().focus().undo().run()} active={false} title="Undo"><Undo size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().redo().run()} active={false} title="Redo"><Redo size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().undo().run()} active={false} title="Undo" accentColor={accentColor}><Undo size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().redo().run()} active={false} title="Redo" accentColor={accentColor}><Redo size={13} /></ToolBtn>
       <ToolDivider />
       <FontSelect typoFont={typo.font} onTypoChange={(v) => onTypoChange({ ...typo, font: v })} editor={editor} />
       <FontSizeSelect typoSize={typo.size} editor={editor} />
       <ToolDivider />
-      <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive("bold")} title="Bold"><Bold size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive("italic")} title="Italic"><Italic size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive("underline")} title="Underline"><UnderlineIcon size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive("code")} title="Code"><Code size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive("bold")} title="Bold" accentColor={accentColor}><Bold size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive("italic")} title="Italic" accentColor={accentColor}><Italic size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive("underline")} title="Underline" accentColor={accentColor}><UnderlineIcon size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive("code")} title="Code" accentColor={accentColor}><Code size={13} /></ToolBtn>
       <ToolDivider />
-      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive("heading", { level: 1 })} title="H1"><Heading1 size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive("heading", { level: 2 })} title="H2"><Heading2 size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive("heading", { level: 1 })} title="H1" accentColor={accentColor}><Heading1 size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive("heading", { level: 2 })} title="H2" accentColor={accentColor}><Heading2 size={13} /></ToolBtn>
       <ToolDivider />
-      <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive("bulletList")} title="Bullet"><List size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive("orderedList")} title="Numbered"><ListOrdered size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive("blockquote")} title="Quote"><Quote size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive("bulletList")} title="Bullet" accentColor={accentColor}><List size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive("orderedList")} title="Numbered" accentColor={accentColor}><ListOrdered size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive("blockquote")} title="Quote" accentColor={accentColor}><Quote size={13} /></ToolBtn>
       <ToolDivider />
-      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("left").run()} active={editor.isActive({ textAlign: "left" })} title="Left"><AlignLeft size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("center").run()} active={editor.isActive({ textAlign: "center" })} title="Center"><AlignCenter size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("right").run()} active={editor.isActive({ textAlign: "right" })} title="Right"><AlignRight size={13} /></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("justify").run()} active={editor.isActive({ textAlign: "justify" })} title="Justify"><AlignJustify size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("left").run()} active={editor.isActive({ textAlign: "left" })} title="Left" accentColor={accentColor}><AlignLeft size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("center").run()} active={editor.isActive({ textAlign: "center" })} title="Center" accentColor={accentColor}><AlignCenter size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("right").run()} active={editor.isActive({ textAlign: "right" })} title="Right" accentColor={accentColor}><AlignRight size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().setTextAlign("justify").run()} active={editor.isActive({ textAlign: "justify" })} title="Justify" accentColor={accentColor}><AlignJustify size={13} /></ToolBtn>
       <ToolDivider />
-      <ToolBtn onClick={() => editor.chain().focus().setHorizontalRule().run()} active={false} title="Divider"><Minus size={13} /></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().setHorizontalRule().run()} active={false} title="Divider" accentColor={accentColor}><Minus size={13} /></ToolBtn>
       <ToolDivider />
-      <ZoomControl zoom={typo.zoom} onZoomChange={(z) => onTypoChange({ ...typo, zoom: z })} />
+      <ZoomControl zoom={typo.zoom} onZoomChange={(z) => onTypoChange({ ...typo, zoom: z })} accentColor={accentColor} />
     </div>
   );
 }
@@ -314,7 +324,7 @@ function MoveToFolderModal({ journal, folders, onMove, onCancel }) {
           </button>
           {folders.map((folder) => (
             <button key={folder.id} onClick={() => onMove(folder.id)} className="w-full flex items-center px-5 py-3 hover:bg-white/5 transition-colors text-left cursor-pointer">
-              <div className="w-6 h-6 rounded flex items-center justify-center" style={{ background: "rgba(255,255,255,0.06)" }}><FolderIcon icon={folder.icon} size={12} /></div>
+              <div className="w-6 h-6 rounded flex items-center justify-center mr-3" style={{ background: "rgba(255,255,255,0.06)" }}><FolderIcon icon={folder.icon} size={12} /></div>
               <span className="font-mono text-xs text-white/70">{folder.name}</span>
               {journal.folder_id === folder.id && <span className="ml-auto font-mono text-[9px] text-white/25">current</span>}
             </button>
@@ -327,7 +337,7 @@ function MoveToFolderModal({ journal, folders, onMove, onCancel }) {
 
 // ── Folder Modal ──────────────────────────────────────────────────────────────
 
-function FolderModal({ folder, onClose, onSave }) {
+function FolderModal({ folder, onClose, onSave, accentColor }) {
   const isEdit = !!folder?.id;
   const [form, setForm] = useState({ name: folder?.name || "", icon: folder?.icon || "folder" });
   const [saving, setSaving] = useState(false);
@@ -355,7 +365,10 @@ function FolderModal({ folder, onClose, onSave }) {
           <div>
             <label className="block font-mono text-[10px] tracking-widest text-white/40 uppercase mb-1.5">Folder Name</label>
             <input value={form.name} onChange={(e) => { setForm({ ...form, name: e.target.value }); setError(""); }} placeholder="My folder..."
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors" />
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 font-mono focus:outline-none transition-colors"
+              onFocus={e => e.target.style.borderColor = `${accentColor}80`}
+              onBlur={e => e.target.style.borderColor = "rgba(255,255,255,0.1)"}
+            />
             {error && <p className="font-mono text-[10px] text-red-400 mt-1">{error}</p>}
           </div>
           <div>
@@ -363,14 +376,17 @@ function FolderModal({ folder, onClose, onSave }) {
             <div className="flex gap-2 flex-wrap">
               {FOLDER_ICONS.map((ic) => (
                 <button key={ic} onClick={() => setForm({ ...form, icon: ic })} className="w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer"
-                  style={{ background: form.icon === ic ? "rgba(200,240,76,0.15)" : "rgba(255,255,255,0.05)", border: form.icon === ic ? "1px solid rgba(200,240,76,0.3)" : "1px solid rgba(255,255,255,0.08)" }}>
+                  style={{
+                    background: form.icon === ic ? `${accentColor}26` : "rgba(255,255,255,0.05)",
+                    border: form.icon === ic ? `1px solid ${accentColor}4d` : "1px solid rgba(255,255,255,0.08)",
+                  }}>
                   <FolderIcon icon={ic} size={14} />
                 </button>
               ))}
             </div>
           </div>
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(200,240,76,0.1)" }}>
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: `${accentColor}1a` }}>
               <FolderIcon icon={form.icon} size={14} />
             </div>
             <span className="font-mono text-sm" style={{ color: "rgba(255,255,255,0.7)" }}>{form.name || "Folder name"}</span>
@@ -379,7 +395,7 @@ function FolderModal({ folder, onClose, onSave }) {
         <div className="px-6 py-4 border-t border-white/8 flex justify-end gap-3">
           <button onClick={onClose} className="px-4 py-2 rounded-lg border border-white/10 text-white/40 font-mono text-xs tracking-widest hover:text-white/60 transition-colors cursor-pointer">CANCEL</button>
           <button onClick={handleSubmit} disabled={saving || !form.name.trim()} className="px-5 py-2 rounded-lg font-mono text-xs tracking-widest transition-all disabled:opacity-30 flex items-center gap-2 cursor-pointer"
-            style={{ background: form.name.trim() ? "#c8f04c" : "#444", color: "#0d0d0d" }}>
+            style={{ background: form.name.trim() ? accentColor : "#444", color: "#0d0d0d" }}>
             {saving && <Loader2 size={12} className="animate-spin" />}
             {isEdit ? "SAVE" : "CREATE"}
           </button>
@@ -391,7 +407,7 @@ function FolderModal({ folder, onClose, onSave }) {
 
 // ── Journal Editor ────────────────────────────────────────────────────────────
 
-function JournalEditor({ journal, onClose }) {
+function JournalEditor({ journal, onClose, accentColor }) {
   const isEdit = !!journal?.id;
   const [title, setTitle] = useState(journal?.title || "");
   const [saveStatus, setSaveStatus] = useState("idle");
@@ -459,11 +475,12 @@ function JournalEditor({ journal, onClose }) {
   const textColor = "rgba(255,255,255,0.78)";
   const headingColor = "rgba(255,255,255,0.95)";
   const placeholderColor = "rgba(255,255,255,0.15)";
-  const caretColor = "#c8f04c";
-  const codeBackground = "rgba(200,240,76,0.08)";
-  const codeColor = "#c8f04c";
+  const caretColor = accentColor;
+  const codeBackground = `${accentColor}14`;
+  const codeColor = accentColor;
   const blockquoteColor = "rgba(255,255,255,0.4)";
-  const blockquoteBorder = "rgba(200,240,76,0.35)";
+  const blockquoteBorder = `${accentColor}59`;
+  const selectionBg = `${accentColor}33`;
   const zoomCompensation = typo.zoom !== 1.0 ? `calc((${typo.zoom} - 1) * 60vh)` : undefined;
 
   return (
@@ -488,7 +505,7 @@ function JournalEditor({ journal, onClose }) {
         .chalk-editor em { font-style: italic; }
         .chalk-editor u { text-decoration: underline; text-underline-offset: 3px; }
         .chalk-editor .is-editor-empty:first-child::before, .chalk-editor .is-empty::before { content: attr(data-placeholder); color: ${placeholderColor}; pointer-events: none; float: left; height: 0; }
-        .chalk-editor ::selection { background: rgba(200,240,76,0.2); }
+        .chalk-editor ::selection { background: ${selectionBg}; }
       `}</style>
       <div className="flex items-center px-6 py-4 border-b sticky top-0 z-20"
         style={{ background: "#0d0d0d", borderColor: "rgba(255,255,255,0.06)", height: 57, gap: 16 }}>
@@ -499,9 +516,9 @@ function JournalEditor({ journal, onClose }) {
           <ArrowLeft size={14} /> JOURNALS
         </button>
         <div style={{ flex: 1 }} />
-        <SaveIndicator status={saveStatus} />
+        <SaveIndicator status={saveStatus} accentColor={accentColor} />
       </div>
-      <FormattingBar editor={editor} typo={typo} onTypoChange={setTypo} />
+      <FormattingBar editor={editor} typo={typo} onTypoChange={setTypo} accentColor={accentColor} />
       <div className="max-w-2xl mx-auto w-full px-6 py-10"
         style={{ transform: `scale(${typo.zoom})`, transformOrigin: "top center", marginBottom: zoomCompensation }}>
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Entry title (optional)"
@@ -521,7 +538,7 @@ function JournalEditor({ journal, onClose }) {
 
 // ── Journal Card ──────────────────────────────────────────────────────────────
 
-function JournalCard({ journal, folders, onEdit, onSoftDelete, onMove, onDragStart, onDragEnd }) {
+function JournalCard({ journal, folders, onEdit, onSoftDelete, onMove, onDragStart, onDragEnd, accentColor }) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [showMove, setShowMove] = useState(false);
   const hasTitle = journal.title?.trim().length > 0;
@@ -537,7 +554,7 @@ function JournalCard({ journal, folders, onEdit, onSoftDelete, onMove, onDragSta
         onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; onDragStart(journal.id); }}
         onDragEnd={onDragEnd}
       >
-        <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{ background: "rgba(200,240,76,0.25)" }} />
+        <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{ background: `${accentColor}40` }} />
         <div className="px-5 py-4 pl-6">
           <div className="flex items-start justify-between gap-3 mb-2">
             <h3 className="font-mono text-sm text-white leading-snug flex-1 min-w-0 truncate">
@@ -591,7 +608,7 @@ function JournalCard({ journal, folders, onEdit, onSoftDelete, onMove, onDragSta
 
 // ── Deleted Journal Card ──────────────────────────────────────────────────────
 
-function DeletedJournalCard({ journal, onRestore, onPermanentDelete }) {
+function DeletedJournalCard({ journal, onRestore, onPermanentDelete, accentColor }) {
   const [showConfirm, setShowConfirm] = useState(false);
   const hasTitle = journal.title?.trim().length > 0;
 
@@ -610,7 +627,7 @@ function DeletedJournalCard({ journal, onRestore, onPermanentDelete }) {
             <button
               onClick={() => onRestore(journal.id)}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all hover:opacity-90 cursor-pointer"
-              style={{ background: "rgba(200,240,76,0.08)", border: "1px solid rgba(200,240,76,0.15)", color: "#c8f04c" }}
+              style={{ background: `${accentColor}14`, border: `1px solid ${accentColor}26`, color: accentColor }}
             >
               <RotateCcw size={10} /> RESTORE
             </button>
@@ -637,9 +654,9 @@ function DeletedJournalCard({ journal, onRestore, onPermanentDelete }) {
   );
 }
 
-// ── Uncategorized Section (collapsible) ──────────────────────────────────────
+// ── Uncategorized Section ─────────────────────────────────────────────────────
 
-function UncategorizedSection({ journals, folders, onEdit, onSoftDelete, onMove, dragOverFolderId, onDragOver, onDragLeave, onDrop, onDragStart, onDragEnd }) {
+function UncategorizedSection({ journals, folders, onEdit, onSoftDelete, onMove, dragOverFolderId, onDragOver, onDragLeave, onDrop, onDragStart, onDragEnd, accentColor }) {
   const [open, setOpen] = useState(true);
   const isDragOver = dragOverFolderId === "uncategorized";
 
@@ -680,6 +697,7 @@ function UncategorizedSection({ journals, folders, onEdit, onSoftDelete, onMove,
                 key={journal.id} journal={journal} folders={folders}
                 onEdit={onEdit} onSoftDelete={onSoftDelete} onMove={onMove}
                 onDragStart={onDragStart} onDragEnd={onDragEnd}
+                accentColor={accentColor}
               />
             ))
           )}
@@ -691,17 +709,19 @@ function UncategorizedSection({ journals, folders, onEdit, onSoftDelete, onMove,
 
 // ── Folder Section ────────────────────────────────────────────────────────────
 
-function FolderSection({ folder, journals, folders, onEdit, onSoftDelete, onDeleteFolder, onEditFolder, onMove, dragOverFolderId, onDragOver, onDragLeave, onDrop, onDragStart, onDragEnd }) {
+function FolderSection({ folder, journals, folders, onEdit, onSoftDelete, onDeleteFolder, onEditFolder, onMove, dragOverFolderId, onDragOver, onDragLeave, onDrop, onDragStart, onDragEnd, accentColor }) {
   const [open, setOpen] = useState(true);
   const [showConfirm, setShowConfirm] = useState(false);
   const isDragOver = dragOverFolderId === folder.id;
 
   return (
     <div className="mb-6">
-      {/* Folder header — same style as SectionLabel */}
       <div
         className="flex items-center gap-2 px-3 py-2 mb-3 group/folder rounded-xl transition-all"
-        style={{ background: isDragOver ? "rgba(200,240,76,0.1)" : "transparent", border: isDragOver ? "1px solid rgba(200,240,76,0.3)" : "1px solid transparent" }}
+        style={{
+          background: isDragOver ? `${accentColor}1a` : "transparent",
+          border: isDragOver ? `1px solid ${accentColor}4d` : "1px solid transparent",
+        }}
         onDragOver={(e) => { e.preventDefault(); onDragOver(folder.id); }}
         onDragLeave={onDragLeave}
         onDrop={(e) => { e.preventDefault(); onDrop(folder.id); }}
@@ -725,7 +745,10 @@ function FolderSection({ folder, journals, folders, onEdit, onSoftDelete, onDele
         <div className="space-y-2 pl-3">
           {journals.length === 0 ? (
             <div className="rounded-xl border border-dashed px-4 py-6 text-center transition-all"
-              style={{ borderColor: isDragOver ? "rgba(200,240,76,0.3)" : "rgba(255,255,255,0.08)", background: isDragOver ? "rgba(200,240,76,0.05)" : "transparent" }}
+              style={{
+                borderColor: isDragOver ? `${accentColor}4d` : "rgba(255,255,255,0.08)",
+                background: isDragOver ? `${accentColor}0d` : "transparent",
+              }}
               onDragOver={(e) => { e.preventDefault(); onDragOver(folder.id); }}
               onDragLeave={onDragLeave}
               onDrop={(e) => { e.preventDefault(); onDrop(folder.id); }}>
@@ -735,7 +758,8 @@ function FolderSection({ folder, journals, folders, onEdit, onSoftDelete, onDele
             journals.map((journal) => (
               <JournalCard key={journal.id} journal={journal} folders={folders}
                 onEdit={onEdit} onSoftDelete={onSoftDelete} onMove={onMove}
-                onDragStart={onDragStart} onDragEnd={onDragEnd} />
+                onDragStart={onDragStart} onDragEnd={onDragEnd}
+                accentColor={accentColor} />
             ))
           )}
         </div>
@@ -754,14 +778,13 @@ function FolderSection({ folder, journals, folders, onEdit, onSoftDelete, onDele
 
 // ── Deleted Folder Card ───────────────────────────────────────────────────────
 
-function DeletedFolderCard({ folder, journals, onRestoreFolder, onPermanentDeleteFolder, onRestoreJournal, onPermanentDeleteJournal }) {
+function DeletedFolderCard({ folder, journals, onRestoreFolder, onPermanentDeleteFolder, onRestoreJournal, onPermanentDeleteJournal, accentColor }) {
   const [open, setOpen] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
   return (
     <>
       <div className="rounded-2xl border border-white/6 overflow-hidden" style={{ background: "#0f0f0f" }}>
-        {/* Folder row */}
         <div className="flex items-center gap-3 px-5 py-3 pl-6">
           <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l" style={{ background: "rgba(255,255,255,0.1)" }} />
           <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer">
@@ -779,7 +802,7 @@ function DeletedFolderCard({ folder, journals, onRestoreFolder, onPermanentDelet
             <button
               onClick={() => onRestoreFolder(folder.id)}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all hover:opacity-90 cursor-pointer"
-              style={{ background: "rgba(200,240,76,0.08)", border: "1px solid rgba(200,240,76,0.15)", color: "#c8f04c" }}
+              style={{ background: `${accentColor}14`, border: `1px solid ${accentColor}26`, color: accentColor }}
             >
               <RotateCcw size={10} /> RESTORE
             </button>
@@ -793,7 +816,6 @@ function DeletedFolderCard({ folder, journals, onRestoreFolder, onPermanentDelet
           </div>
         </div>
 
-        {/* Journals inside deleted folder */}
         {open && (
           <div className="border-t border-white/5">
             {journals.length === 0 ? (
@@ -811,7 +833,7 @@ function DeletedFolderCard({ folder, journals, onRestoreFolder, onPermanentDelet
                       <button
                         onClick={() => onRestoreJournal(journal.id)}
                         className="flex items-center gap-1 px-2 py-1 rounded font-mono text-[9px] tracking-widest transition-all hover:opacity-90 cursor-pointer"
-                        style={{ background: "rgba(200,240,76,0.06)", border: "1px solid rgba(200,240,76,0.1)", color: "rgba(200,240,76,0.6)" }}
+                        style={{ background: `${accentColor}0f`, border: `1px solid ${accentColor}1a`, color: `${accentColor}99` }}
                       >
                         <RotateCcw size={9} /> RESTORE
                       </button>
@@ -840,7 +862,7 @@ function DeletedFolderCard({ folder, journals, onRestoreFolder, onPermanentDelet
 
 // ── Recently Deleted Section ──────────────────────────────────────────────────
 
-function RecentlyDeletedSection({ deletedJournals, deletedFolders, journalsInDeletedFolders, onRestoreJournal, onPermanentDeleteJournal, onRestoreFolder, onPermanentDeleteFolder, onClearAll }) {
+function RecentlyDeletedSection({ deletedJournals, deletedFolders, journalsInDeletedFolders, onRestoreJournal, onPermanentDeleteJournal, onRestoreFolder, onPermanentDeleteFolder, onClearAll, accentColor }) {
   const [open, setOpen] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const totalCount = deletedJournals.length + deletedFolders.length;
@@ -876,7 +898,6 @@ function RecentlyDeletedSection({ deletedJournals, deletedFolders, journalsInDel
             </div>
           ) : (
             <>
-              {/* Deleted folders */}
               {deletedFolders.map((folder) => (
                 <DeletedFolderCard
                   key={folder.id}
@@ -886,15 +907,16 @@ function RecentlyDeletedSection({ deletedJournals, deletedFolders, journalsInDel
                   onPermanentDeleteFolder={onPermanentDeleteFolder}
                   onRestoreJournal={onRestoreJournal}
                   onPermanentDeleteJournal={onPermanentDeleteJournal}
+                  accentColor={accentColor}
                 />
               ))}
-              {/* Deleted journals (not in a deleted folder) */}
               {deletedJournals.map((journal) => (
                 <DeletedJournalCard
                   key={journal.id}
                   journal={journal}
                   onRestore={onRestoreJournal}
                   onPermanentDelete={onPermanentDeleteJournal}
+                  accentColor={accentColor}
                 />
               ))}
             </>
@@ -918,6 +940,8 @@ function RecentlyDeletedSection({ deletedJournals, deletedFolders, journalsInDel
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function Journals() {
+  const { accentColor } = useSettings();
+
   const [journals, setJournals] = useState([]);
   const [deletedJournals, setDeletedJournals] = useState([]);
   const [folders, setFolders] = useState([]);
@@ -939,7 +963,6 @@ export default function Journals() {
         getJournals(), getDeletedJournals(), getFolders(), getDeletedFolders(),
       ]);
       const activeFolderIds = new Set((folderData || []).map(f => f.id));
-      // Journals in deleted folders — still have folder_id but folder is soft-deleted
       const deletedFolderIds = new Set((deletedFolderData || []).map(f => f.id));
       const inDeletedFolders = (journalData || []).filter(j => j.folder_id && deletedFolderIds.has(j.folder_id));
       const activeJournals = (journalData || []).filter(j => !j.folder_id || activeFolderIds.has(j.folder_id));
@@ -965,11 +988,9 @@ export default function Journals() {
   async function handleRestoreJournal(id) {
     try {
       await restoreJournal(id);
-      // Check both deletedJournals and journalsInDeletedFolders
       const j = deletedJournals.find(x => x.id === id) || journalsInDeletedFolders.find(x => x.id === id);
       setDeletedJournals(prev => prev.filter(x => x.id !== id));
       setJournalsInDeletedFolders(prev => prev.filter(x => x.id !== id));
-      // Restore to uncategorized since its folder may be deleted
       if (j) setJournals(prev => [{ ...j, deleted_at: null, folder_id: null }, ...prev]);
     } catch (e) { setPageError(e.message); }
   }
@@ -988,7 +1009,6 @@ export default function Journals() {
       const f = deletedFolders.find(x => x.id === id);
       setDeletedFolders(prev => prev.filter(x => x.id !== id));
       if (f) setFolders(prev => [...prev, { ...f, deleted_at: null }]);
-      // Move journals that belong to this folder back to active list
       const rejoined = journalsInDeletedFolders.filter(j => j.folder_id === id);
       setJournalsInDeletedFolders(prev => prev.filter(j => j.folder_id !== id));
       setJournals(prev => [...prev, ...rejoined]);
@@ -1009,7 +1029,6 @@ export default function Journals() {
       const f = folders.find(x => x.id === id);
       setFolders(prev => prev.filter(x => x.id !== id));
       if (f) setDeletedFolders(prev => [{ ...f, deleted_at: new Date().toISOString() }, ...prev]);
-      // Move journals of this folder to journalsInDeletedFolders (hidden from main view)
       const affected = journals.filter(j => j.folder_id === id);
       setJournals(prev => prev.filter(j => j.folder_id !== id));
       setJournalsInDeletedFolders(prev => [...prev, ...affected]);
@@ -1050,6 +1069,7 @@ export default function Journals() {
       <JournalEditor
         journal={editing?.id ? editing : null}
         onClose={() => { setEditing(null); load(); }}
+        accentColor={accentColor}
       />
     );
   }
@@ -1077,12 +1097,12 @@ export default function Journals() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <BookOpen size={14} className="text-[#c8f04c]" />
+              <BookOpen size={14} style={{ color: accentColor }} />
               <span className="font-mono text-[11px] tracking-widest text-white/30 uppercase">Chalk / Journals</span>
             </div>
             <h1 className="text-2xl font-mono text-white">
               Journals
-              {journals.length > 0 && <span className="ml-2 text-sm" style={{ color: "#c8f04c" }}>{journals.length}</span>}
+              {journals.length > 0 && <span className="ml-2 text-sm" style={{ color: accentColor }}>{journals.length}</span>}
             </h1>
           </div>
           <div className="flex items-center gap-2">
@@ -1096,7 +1116,7 @@ export default function Journals() {
             <button
               onClick={() => setEditing({})}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs tracking-widest transition-all hover:opacity-90 active:scale-95 cursor-pointer"
-              style={{ background: "#c8f04c", color: "#0d0d0d", fontWeight: "500" }}
+              style={{ background: accentColor, color: "#0d0d0d", fontWeight: "500" }}
             >
               <Plus size={13} /> NEW ENTRY
             </button>
@@ -1119,13 +1139,12 @@ export default function Journals() {
             </div>
             <p className="font-mono text-white/15 text-[10px] tracking-widest uppercase mb-3">No entries yet</p>
             <p className="font-mono text-white/40 text-sm max-w-xs mx-auto leading-relaxed mb-8" style={{ fontStyle: "italic" }}>"{quote}"</p>
-            <button onClick={() => setEditing({})} className="px-5 py-2.5 rounded-xl font-mono text-xs tracking-widest cursor-pointer" style={{ background: "#c8f04c", color: "#0d0d0d" }}>
+            <button onClick={() => setEditing({})} className="px-5 py-2.5 rounded-xl font-mono text-xs tracking-widest cursor-pointer" style={{ background: accentColor, color: "#0d0d0d" }}>
               WRITE YOUR FIRST ENTRY
             </button>
           </div>
         ) : (
           <>
-            {/* Folder sections */}
             {folders.map((folder) => (
               <FolderSection
                 key={folder.id}
@@ -1143,10 +1162,10 @@ export default function Journals() {
                 onDrop={handleDrop}
                 onDragStart={(id) => setDraggingJournalId(id)}
                 onDragEnd={() => { setDraggingJournalId(null); setDragOverFolderId(null); }}
+                accentColor={accentColor}
               />
             ))}
 
-            {/* Uncategorized — collapsible, always shown when folders exist */}
             {(folders.length > 0 || uncategorized.length > 0) && (
               <UncategorizedSection
                 journals={uncategorized}
@@ -1160,14 +1179,14 @@ export default function Journals() {
                 onDrop={handleDrop}
                 onDragStart={(id) => setDraggingJournalId(id)}
                 onDragEnd={() => { setDraggingJournalId(null); setDragOverFolderId(null); }}
+                accentColor={accentColor}
               />
             )}
 
-            {/* No live journals but folders exist */}
             {journals.length === 0 && folders.length > 0 && (
               <div className="text-center py-12">
                 <p className="font-mono text-white/20 text-xs tracking-widest mb-4">Write your first entry</p>
-                <button onClick={() => setEditing({})} className="px-5 py-2.5 rounded-xl font-mono text-xs tracking-widest cursor-pointer" style={{ background: "#c8f04c", color: "#0d0d0d" }}>
+                <button onClick={() => setEditing({})} className="px-5 py-2.5 rounded-xl font-mono text-xs tracking-widest cursor-pointer" style={{ background: accentColor, color: "#0d0d0d" }}>
                   NEW ENTRY
                 </button>
               </div>
@@ -1175,7 +1194,6 @@ export default function Journals() {
           </>
         )}
 
-        {/* Recently Deleted — always visible */}
         <RecentlyDeletedSection
           deletedJournals={deletedJournals}
           deletedFolders={deletedFolders}
@@ -1185,6 +1203,7 @@ export default function Journals() {
           onRestoreFolder={handleRestoreFolder}
           onPermanentDeleteFolder={handlePermanentDeleteFolder}
           onClearAll={handleClearAll}
+          accentColor={accentColor}
         />
       </div>
 
@@ -1193,6 +1212,7 @@ export default function Journals() {
           folder={editingFolder}
           onClose={() => { setShowFolderModal(false); setEditingFolder(null); }}
           onSave={() => { setShowFolderModal(false); setEditingFolder(null); load(); }}
+          accentColor={accentColor}
         />
       )}
     </div>
