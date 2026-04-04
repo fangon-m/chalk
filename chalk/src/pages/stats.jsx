@@ -5,6 +5,7 @@ import {
   Target, Clock,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import { useSettings } from "../context/SettingsContext.jsx";
 
 // ── Daily Quote ───────────────────────────────────────────────────────────────
 
@@ -43,7 +44,6 @@ const QUOTES = [
 
 function getDailyQuote() {
   const today = new Date();
-  // Use date string as seed so it's the same all day, different tomorrow
   const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
   return QUOTES[seed % QUOTES.length];
 }
@@ -63,28 +63,23 @@ function getMonthRange() {
   return { firstDay, today, daysElapsed, daysInMonth, monthName, year };
 }
 
-// Returns how many scheduled days have elapsed so far this month,
-// starting from the streak's created_at date (not the 1st of the month)
 function scheduledDaysElapsed(scheduledDays, createdAt = null) {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
   const todayDate = now.getDate();
 
-  // Parse created_at into local parts — new Date() alone shifts UTC to local
   let startDay = 1;
   if (createdAt) {
     const raw = new Date(createdAt);
-    // Reconstruct in local time to avoid UTC offset shift
     const cy = raw.getFullYear();
     const cm = raw.getMonth();
     const cd = raw.getDate();
     if (cy === year && cm === month) {
       startDay = cd;
     } else if (cy > year || (cy === year && cm > month)) {
-      return 0; // created in the future
+      return 0;
     }
-    // created before this month → startDay stays 1
   }
 
   if (!scheduledDays || scheduledDays.length === 0) {
@@ -98,15 +93,12 @@ function scheduledDaysElapsed(scheduledDays, createdAt = null) {
   return Math.max(0, count);
 }
 
-// Returns total number of scheduled days in the current month
-// (including future dates, but starting from streak creation date)
 function totalScheduledDaysInMonth(scheduledDays, createdAt = null) {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-  // Parse created_at into local parts
   let startDay = 1;
   if (createdAt) {
     const raw = new Date(createdAt);
@@ -116,9 +108,8 @@ function totalScheduledDaysInMonth(scheduledDays, createdAt = null) {
     if (cy === year && cm === month) {
       startDay = cd;
     } else if (cy > year || (cy === year && cm > month)) {
-      return 0; // created in the future
+      return 0;
     }
-    // created before this month → startDay stays 1
   }
 
   if (!scheduledDays || scheduledDays.length === 0) {
@@ -206,7 +197,7 @@ function CollapsibleSection({ title, subtitle, children, defaultOpen = false }) 
 
 // ── Honor Award Modal ─────────────────────────────────────────────────────────
 
-function HonorAward({ monthName, year, onClose }) {
+function HonorAward({ monthName, year, onClose, accentColor }) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
@@ -215,14 +206,18 @@ function HonorAward({ monthName, year, onClose }) {
     >
       <div
         className="relative rounded-2xl border p-10 flex flex-col items-center text-center max-w-sm mx-4"
-        style={{ background: "#111", borderColor: "rgba(200,240,76,0.3)", boxShadow: "0 0 60px rgba(200,240,76,0.08)" }}
+        style={{
+          background: "#111",
+          borderColor: `${accentColor}4d`,
+          boxShadow: `0 0 60px ${accentColor}14`,
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         <div
           className="w-20 h-20 rounded-full flex items-center justify-center mb-6"
-          style={{ background: "rgba(200,240,76,0.08)", border: "2px solid rgba(200,240,76,0.3)" }}
+          style={{ background: `${accentColor}14`, border: `2px solid ${accentColor}4d` }}
         >
-          <Award size={36} style={{ color: "#c8f04c" }} />
+          <Award size={36} style={{ color: accentColor }} />
         </div>
         <p className="font-mono text-[10px] tracking-widest text-white/30 uppercase mb-2">Honor Award</p>
         <h2 className="font-mono text-2xl text-white mb-2">Perfect Month</h2>
@@ -232,13 +227,13 @@ function HonorAward({ monthName, year, onClose }) {
         </p>
         <div className="flex items-center gap-2 mb-8">
           {[0, 1, 2].map(i => (
-            <Star key={i} size={18} style={{ color: "#c8f04c", fill: "#c8f04c" }} />
+            <Star key={i} size={18} style={{ color: accentColor, fill: accentColor }} />
           ))}
         </div>
         <button
           onClick={onClose}
           className="px-6 py-2.5 rounded-xl font-mono text-xs tracking-widest transition-all hover:opacity-90 active:scale-95"
-          style={{ background: "#c8f04c", color: "#0d0d0d" }}
+          style={{ background: accentColor, color: "#0d0d0d" }}
         >
           CLAIM HONOR
         </button>
@@ -249,12 +244,12 @@ function HonorAward({ monthName, year, onClose }) {
 
 // ── Life Score Ring ───────────────────────────────────────────────────────────
 
-function LifeScoreRing({ score, isComplete }) {
+function LifeScoreRing({ score, isComplete, accentColor }) {
   const radius = 54;
   const circumference = 2 * Math.PI * radius;
   const filled = (score / 100) * circumference;
-  const color = isComplete ? "#c8f04c"
-    : score >= 75 ? "#c8f04c"
+  const color = isComplete ? accentColor
+    : score >= 75 ? accentColor
     : score >= 50 ? "#eab308"
     : score >= 25 ? "#f97316"
     : "#6b7280";
@@ -272,7 +267,7 @@ function LifeScoreRing({ score, isComplete }) {
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         {isComplete ? (
-          <Award size={28} style={{ color: "#c8f04c" }} />
+          <Award size={28} style={{ color: accentColor }} />
         ) : (
           <>
             <span className="font-mono text-3xl font-medium text-white">{score}</span>
@@ -286,10 +281,10 @@ function LifeScoreRing({ score, isComplete }) {
 
 // ── Streak Row ────────────────────────────────────────────────────────────────
 
-function StreakStatRow({ streak, checkedInDays }) {
+function StreakStatRow({ streak, checkedInDays, accentColor }) {
   const total       = totalScheduledDaysInMonth(streak.scheduled_days, streak.created_at);
   const consistency = total > 0 ? Math.min(100, Math.round((checkedInDays / total) * 100)) : 0;
-  const barColor = consistency === 100 ? "#c8f04c"
+  const barColor = consistency === 100 ? accentColor
     : consistency >= 75 ? "#eab308"
     : consistency >= 50 ? "#f97316"
     : "#6b7280";
@@ -306,7 +301,7 @@ function StreakStatRow({ streak, checkedInDays }) {
         </div>
         <span className="font-mono text-[11px] w-8 text-right" style={{ color: barColor }}>{consistency}%</span>
         <span className="font-mono text-[10px] text-white/25 w-14 text-right">{checkedInDays}/{total}d</span>
-        {consistency === 100 && <CheckCircle2 size={12} style={{ color: "#c8f04c" }} />}
+        {consistency === 100 && <CheckCircle2 size={12} style={{ color: accentColor }} />}
       </div>
     </div>
   );
@@ -314,7 +309,7 @@ function StreakStatRow({ streak, checkedInDays }) {
 
 // ── Mission Row ───────────────────────────────────────────────────────────────
 
-function MissionStatRow({ mission }) {
+function MissionStatRow({ mission, accentColor }) {
   const progress = Math.round(mission.progress ?? 0);
   const color = getPriorityColor(mission.priority);
   const days = daysUntil(mission.timeline);
@@ -331,7 +326,7 @@ function MissionStatRow({ mission }) {
           {isFinished && (
             <span
               className="font-mono text-[9px] tracking-widest px-1.5 py-0.5 rounded shrink-0"
-              style={{ color: "#c8f04c", background: "rgba(200,240,76,0.08)", border: "1px solid rgba(200,240,76,0.15)" }}
+              style={{ color: accentColor, background: `${accentColor}14`, border: `1px solid ${accentColor}26` }}
             >
               DONE
             </span>
@@ -366,6 +361,8 @@ function MissionStatRow({ mission }) {
 // ── Main Stats Page ───────────────────────────────────────────────────────────
 
 export default function Stats() {
+  const { accentColor } = useSettings();
+
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
   const [streaks, setStreaks] = useState([]);
@@ -464,7 +461,7 @@ export default function Stats() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <BarChart2 size={14} className="text-[#c8f04c]" />
+              <BarChart2 size={14} style={{ color: accentColor }} />
               <span className="font-mono text-[11px] tracking-widest text-white/30 uppercase">Chalk / Stats</span>
             </div>
             <h1 className="text-2xl font-mono text-white">Overview</h1>
@@ -480,15 +477,9 @@ export default function Stats() {
           </div>
         )}
 
-        {/* ── Daily Quote ── */}
-        <div
-          className="rounded-2xl border mb-4 px-6 py-5"
-          style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)" }}
-        >
-          <p
-            className="font-mono text-sm leading-relaxed mb-3"
-            style={{ color: "rgba(255,255,255,0.40)", fontStyle: "italic" }}
-          >
+        {/* Daily Quote */}
+        <div className="rounded-2xl border mb-4 px-6 py-5" style={{ background: "#111", borderColor: "rgba(255,255,255,0.08)" }}>
+          <p className="font-mono text-sm leading-relaxed mb-3" style={{ color: "rgba(255,255,255,0.40)", fontStyle: "italic" }}>
             "{dailyQuote.text}"
           </p>
           <p className="font-mono text-[10px] tracking-widest" style={{ color: "rgba(255,255,255,0.30)" }}>
@@ -496,12 +487,15 @@ export default function Stats() {
           </p>
         </div>
 
-        {/* ── Life Score Card ── */}
+        {/* Life Score Card */}
         <div
           className="rounded-2xl border mb-4 overflow-hidden"
-          style={{ background: "#111", borderColor: isComplete ? "rgba(200,240,76,0.25)" : "rgba(255,255,255,0.08)" }}
+          style={{
+            background: "#111",
+            borderColor: isComplete ? `${accentColor}40` : "rgba(255,255,255,0.08)",
+          }}
         >
-          {isComplete && <div className="h-0.5 w-full" style={{ background: "#c8f04c" }} />}
+          {isComplete && <div className="h-0.5 w-full" style={{ background: accentColor }} />}
           <div className="px-6 py-6">
             <div className="flex items-center justify-between mb-6">
               <div>
@@ -511,16 +505,16 @@ export default function Stats() {
               {isComplete && (
                 <div
                   className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
-                  style={{ background: "rgba(200,240,76,0.08)", border: "1px solid rgba(200,240,76,0.2)" }}
+                  style={{ background: `${accentColor}14`, border: `1px solid ${accentColor}33` }}
                 >
-                  <Award size={12} style={{ color: "#c8f04c" }} />
-                  <span className="font-mono text-[10px] tracking-widest" style={{ color: "#c8f04c" }}>HONOR AWARDED</span>
+                  <Award size={12} style={{ color: accentColor }} />
+                  <span className="font-mono text-[10px] tracking-widest" style={{ color: accentColor }}>HONOR AWARDED</span>
                 </div>
               )}
             </div>
 
             <div className="flex items-center gap-8">
-              <LifeScoreRing score={lifeScore} isComplete={isComplete} />
+              <LifeScoreRing score={lifeScore} isComplete={isComplete} accentColor={accentColor} />
               <div className="flex-1 space-y-4">
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
@@ -538,7 +532,7 @@ export default function Stats() {
                   </div>
                   <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
                     <p className="font-mono text-[9px] tracking-widest text-white/25 uppercase mb-1">Perfect</p>
-                    <p className="font-mono text-xl" style={{ color: "#c8f04c" }}>{perfectCount}</p>
+                    <p className="font-mono text-xl" style={{ color: accentColor }}>{perfectCount}</p>
                   </div>
                 </div>
                 {!isComplete && streaks.length > 0 && (
@@ -551,7 +545,7 @@ export default function Stats() {
           </div>
         </div>
 
-        {/* ── Streak Consistency ── */}
+        {/* Streak Consistency */}
         {streaks.length > 0 && (
           <CollapsibleSection title="Streak Consistency" subtitle="This month">
             <div className="px-5">
@@ -560,9 +554,8 @@ export default function Stats() {
                 let checkedInDays = 0;
                 if (logs) {
                   const createdDateStr = localDateStr(streak.created_at);
-                  const { monthName, year } = getMonthRange();
+                  const { year } = getMonthRange();
                   const monthStr = `${year}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
-                  // Count logs in the current month
                   checkedInDays = [...logs].filter(d => d.startsWith(monthStr) && d >= createdDateStr).length;
                 }
                 return (
@@ -570,6 +563,7 @@ export default function Stats() {
                     key={streak.id}
                     streak={streak}
                     checkedInDays={checkedInDays}
+                    accentColor={accentColor}
                   />
                 );
               })}
@@ -577,7 +571,7 @@ export default function Stats() {
           </CollapsibleSection>
         )}
 
-        {/* ── Shield Status ── */}
+        {/* Shield Status */}
         {streaks.length > 0 && (
           <CollapsibleSection title="Shield Status">
             <div className="px-5 py-4 grid grid-cols-2 gap-3">
@@ -605,12 +599,12 @@ export default function Stats() {
           </CollapsibleSection>
         )}
 
-        {/* ── Mission Progress ── */}
+        {/* Mission Progress */}
         {missions.length > 0 && (
           <CollapsibleSection title="Mission Progress" subtitle={`${inProgress.length} in progress · ${finished.length} done`}>
             <div className="px-5">
               {inProgress.map((mission) => (
-                <MissionStatRow key={mission.id} mission={mission} />
+                <MissionStatRow key={mission.id} mission={mission} accentColor={accentColor} />
               ))}
               {finished.length > 0 && (
                 <>
@@ -623,7 +617,7 @@ export default function Stats() {
                   )}
                   {finished.map((mission) => (
                     <div key={mission.id} style={{ opacity: 0.45 }}>
-                      <MissionStatRow mission={mission} />
+                      <MissionStatRow mission={mission} accentColor={accentColor} />
                     </div>
                   ))}
                 </>
@@ -648,7 +642,7 @@ export default function Stats() {
           <button
             onClick={() => setShowAward(true)}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-mono text-xs tracking-widest transition-all hover:opacity-90 active:scale-95 mt-2"
-            style={{ background: "rgba(200,240,76,0.08)", border: "1px solid rgba(200,240,76,0.2)", color: "#c8f04c" }}
+            style={{ background: `${accentColor}14`, border: `1px solid ${accentColor}33`, color: accentColor }}
           >
             <Award size={13} />
             VIEW HONOR AWARD
@@ -657,7 +651,7 @@ export default function Stats() {
       </div>
 
       {showAward && (
-        <HonorAward monthName={monthName} year={year} onClose={() => setShowAward(false)} />
+        <HonorAward monthName={monthName} year={year} onClose={() => setShowAward(false)} accentColor={accentColor} />
       )}
     </div>
   );
