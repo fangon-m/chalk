@@ -57,6 +57,7 @@ function PriorityBadge({ priority, accentColor }) {
 // ── Streak Dropdown (searchable checkboxes) ───────────────────────────────────
 
 function StreakDropdown({ streaks: initialStreaks, selected = [], onChange, placeholder = "Connect streaks...", onStreakCreated }) {
+  const { accentColor } = useSettings();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [streaks, setStreaks] = useState(initialStreaks);
@@ -122,7 +123,8 @@ function StreakDropdown({ streaks: initialStreaks, selected = [], onChange, plac
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors hover:border-white/20"
+        className="w-full flex items-center justify-between bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 font-mono focus:outline-none transition-colors hover:border-white/20"
+        style={{ focusBorderColor: `${accentColor}80` }}
       >
         <span className="text-white/40 text-xs truncate">
           {selectedStreaks.length === 0 ? placeholder : selectedStreaks.map((s) => s.name).join(", ")}
@@ -166,8 +168,8 @@ function StreakDropdown({ streaks: initialStreaks, selected = [], onChange, plac
                     <div
                       className="w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all"
                       style={{
-                        background: checked ? "#c8f04c" : "transparent",
-                        borderColor: checked ? "#c8f04c" : "rgba(255,255,255,0.2)",
+                        background: checked ? accentColor : "transparent",
+                        borderColor: checked ? accentColor : "rgba(255,255,255,0.2)",
                       }}
                     >
                       {checked && <Check size={10} style={{ color: "#0d0d0d" }} strokeWidth={3} />}
@@ -191,14 +193,16 @@ function StreakDropdown({ streaks: initialStreaks, selected = [], onChange, plac
                 onChange={(e) => { setNewName(e.target.value); setSaveError(""); }}
                 onKeyDown={(e) => { if (e.key === "Enter") handleCreateStreak(); if (e.key === "Escape") setAddingNew(false); }}
                 placeholder="Streak name"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-white/25 font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-white/25 font-mono focus:outline-none transition-colors"
+                style={{ focusBorderColor: `${accentColor}80` }}
               />
               <input
                 value={newDesc}
                 onChange={(e) => setNewDesc(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleCreateStreak(); if (e.key === "Escape") setAddingNew(false); }}
                 placeholder="Description (optional)"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-white/25 font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-white/25 font-mono focus:outline-none transition-colors"
+                style={{ focusBorderColor: `${accentColor}80` }}
               />
               {saveError && <p className="font-mono text-[10px] text-red-400">{saveError}</p>}
               <div className="flex gap-2">
@@ -214,7 +218,7 @@ function StreakDropdown({ streaks: initialStreaks, selected = [], onChange, plac
                   onClick={handleCreateStreak}
                   disabled={saving || !newName.trim()}
                   className="flex-2 px-3 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all disabled:opacity-40 flex items-center justify-center gap-1.5 cursor-pointer"
-                  style={{ background: "#c8f04c", color: "#0d0d0d", flex: 2 }}
+                  style={{ background: accentColor, color: "#0d0d0d", flex: 2 }}
                 >
                   {saving ? <Loader size={10} className="animate-spin" /> : <Check size={10} strokeWidth={3} />}
                   CREATE & SELECT
@@ -237,7 +241,10 @@ function StreakDropdown({ streaks: initialStreaks, selected = [], onChange, plac
                 <button
                   type="button"
                   onClick={() => { setAddingNew(true); setQuery(""); }}
-                  className="flex items-center gap-1 font-mono text-[10px] tracking-widest text-[#c8f04c]/70 hover:text-[#c8f04c] transition-colors"
+                  className="flex items-center gap-1 font-mono text-[10px] tracking-widest transition-colors"
+                  style={{ color: `${accentColor}B3`, outline: "none" }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = accentColor}
+                  onMouseLeave={(e) => e.currentTarget.style.color = `${accentColor}B3`}
                 >
                   <Plus size={10} /> NEW STREAK
                 </button>
@@ -253,6 +260,7 @@ function StreakDropdown({ streaks: initialStreaks, selected = [], onChange, plac
 // ── Add/Edit Modal ────────────────────────────────────────────────────────────
 
 function MissionModal({ mission, onClose, onSave, streaks, missions, onStreakCreated }) {
+  const { accentColor } = useSettings();
   const isEdit = !!mission?.id;
   const [submitted, setSubmitted] = useState(false);
   const [form, setForm] = useState(() => {
@@ -336,7 +344,8 @@ function MissionModal({ mission, onClose, onSave, streaks, missions, onStreakCre
                 setTitleError(duplicate ? "A mission with this title already exists" : "");
               }}
               placeholder="What are you pursuing?"
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 font-mono focus:outline-none transition-colors"
+              style={{ focusBorderColor: `${accentColor}80` }}
             />
             {titleError && <p className="font-mono text-[10px] text-red-400 mt-1">{titleError}</p>}
           </div>
@@ -349,7 +358,8 @@ function MissionModal({ mission, onClose, onSave, streaks, missions, onStreakCre
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               rows={2}
               placeholder="Brief context..."
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors resize-none"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 font-mono focus:outline-none transition-colors resize-none"
+              style={{ focusBorderColor: `${accentColor}80` }}
             />
           </div>
 
@@ -360,7 +370,8 @@ function MissionModal({ mission, onClose, onSave, streaks, missions, onStreakCre
               <select
                 value={form.priority}
                 onChange={(e) => setForm({ ...form, priority: Number(e.target.value) })}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors cursor-pointer"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white font-mono focus:outline-none transition-colors cursor-pointer"
+                style={{ focusBorderColor: `${accentColor}80` }}
               >
                 <option value={1}>High</option>
                 <option value={2}>Medium</option>
@@ -379,7 +390,8 @@ function MissionModal({ mission, onClose, onSave, streaks, missions, onStreakCre
                   setDateError(val && val < today ? "Target date can't be in the past" : "");
                 }}
                 min={new Date().toISOString().split("T")[0]}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-[#c8f04c]/50 transition-colors cursor-pointer"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white font-mono focus:outline-none transition-colors cursor-pointer"
+                style={{ focusBorderColor: `${accentColor}80` }}
               />
               {dateError && <p className="font-mono text-[10px] text-red-400 mt-1">{dateError}</p>}
             </div>
@@ -398,7 +410,10 @@ function MissionModal({ mission, onClose, onSave, streaks, missions, onStreakCre
               </div>
               <button
                 onClick={addMilestone}
-                className="font-mono text-[10px] text-[#c8f04c]/70 hover:text-[#c8f04c] tracking-widest transition-colors flex items-center gap-1 cursor-pointer"
+                className="font-mono text-[10px] tracking-widest transition-colors flex items-center gap-1 cursor-pointer"
+                style={{ color: `${accentColor}B3` }}
+                onMouseEnter={(e) => e.currentTarget.style.color = accentColor}
+                onMouseLeave={(e) => e.currentTarget.style.color = `${accentColor}B3`}
               >
                 <Plus size={10} /> ADD
               </button>
@@ -419,7 +434,8 @@ function MissionModal({ mission, onClose, onSave, streaks, missions, onStreakCre
                       value={ms.title}
                       onChange={(e) => updateMilestoneTitle(idx, e.target.value)}
                       placeholder={`Milestone ${idx + 1}`}
-                      className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 font-mono focus:outline-none focus:border-[#c8f04c]/40 transition-colors"
+                      className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 font-mono focus:outline-none transition-colors"
+                      style={{ focusBorderColor: `${accentColor}66` }}
                     />
                     <button
                       onClick={() => removeMilestone(idx)}
@@ -451,8 +467,25 @@ function MissionModal({ mission, onClose, onSave, streaks, missions, onStreakCre
                   className={`w-full py-4 rounded-xl border border-dashed transition-all flex items-center justify-center gap-2 cursor-pointer ${
                     submitted && !hasAtLeastOneMilestone
                       ? "border-red-400/30 bg-red-400/5 text-red-400/50 hover:border-red-400/50 hover:text-red-400/70"
-                      : "border-white/10 hover:border-[#c8f04c]/30 hover:bg-[#c8f04c]/5 text-white/25 hover:text-[#c8f04c]/60"
+                      : "border-white/10 text-white/25"
                   }`}
+                  style={submitted && !hasAtLeastOneMilestone ? {} : {
+                    borderColor: `${accentColor}4D`,
+                    backgroundColor: `${accentColor}0D`,
+                    color: `${accentColor}99`
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!(submitted && !hasAtLeastOneMilestone)) {
+                      e.currentTarget.style.borderColor = `${accentColor}80`;
+                      e.currentTarget.style.color = `${accentColor}99`;
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!(submitted && !hasAtLeastOneMilestone)) {
+                      e.currentTarget.style.borderColor = `${accentColor}4D`;
+                      e.currentTarget.style.color = `${accentColor}99`;
+                    }
+                  }}
                 >
                   <Plus size={12} />
                   <span className="font-mono text-[10px] tracking-widest">ADD FIRST MILESTONE</span>
@@ -474,7 +507,7 @@ function MissionModal({ mission, onClose, onSave, streaks, missions, onStreakCre
             onClick={handleSubmitClick}
             className="px-5 py-2 rounded-lg font-mono text-xs tracking-widest transition-all"
             style={{
-              background: canSubmit ? "#c8f04c" : submitted ? "rgba(239,68,68,0.15)" : "#444",
+              background: canSubmit ? accentColor : submitted ? "rgba(239,68,68,0.15)" : "#444",
               color: canSubmit ? "#0d0d0d" : submitted ? "#ef4444" : "rgba(255,255,255,0.3)",
               border: submitted && !canSubmit ? "1px solid rgba(239,68,68,0.3)" : "1px solid transparent",
               cursor: "pointer",
@@ -575,7 +608,7 @@ function RoadmapView({ mission, onBack, onUpdate, allStreaks }) {
         </div>
         <div className="flex items-center gap-3 mt-4">
           <div className="flex-1"><ProgressBar value={displayProgress} /></div>
-          <span className="font-mono text-xs tabular-nums flex items-center gap-1.5" style={{ color: "#c8f04c" }}>
+          <span className="font-mono text-xs tabular-nums flex items-center gap-1.5" style={{ color: accentColor }}>
             {recalculating && <Loader size={10} className="animate-spin opacity-60" />}
             {displayProgress}%
           </span>
@@ -597,7 +630,7 @@ function RoadmapView({ mission, onBack, onUpdate, allStreaks }) {
           {doneMilestones > 0 && doneMilestones < totalMilestones && (
             <>
               <span className="text-white/10 text-[9px]">·</span>
-              <span className="font-mono text-[9px] text-[#c8f04c]/50">{doneMilestones}/{totalMilestones} milestones done</span>
+              <span className="font-mono text-[9px]" style={{ color: `${accentColor}80` }}>{doneMilestones}/{totalMilestones} milestones done</span>
             </>
           )}
         </div>
@@ -620,28 +653,37 @@ function RoadmapView({ mission, onBack, onUpdate, allStreaks }) {
                 <div key={ml.id} className="relative">
                   <div
                     className="absolute -left-8 top-1 w-3 h-3 rounded-full border-2 flex items-center justify-center cursor-pointer transition-all"
-                    style={{ borderColor: isDone ? "#c8f04c" : "rgba(255,255,255,0.2)", background: isDone ? "rgba(200,240,76,0.2)" : "#0d0d0d" }}
+                    style={{ borderColor: isDone ? accentColor : "rgba(255,255,255,0.2)", background: isDone ? `${accentColor}33` : "#0d0d0d" }}
                     onClick={() => toggleMilestone(mlIdx)}
                   >
-                    {isDone && <div className="w-2 h-2 rounded-full" style={{ background: "#c8f04c" }} />}
+                    {isDone && <div className="w-2 h-2 rounded-full" style={{ background: accentColor }} />}
                   </div>
 
                   <div>
                     <div className="flex items-center gap-2 mb-2">
-                      <span className={`font-mono text-sm tracking-wide ${isDone ? "text-[#c8f04c]" : "text-white/70"}`}>
+                      <span className="font-mono text-sm tracking-wide" style={{ color: isDone ? accentColor : "rgba(255,255,255,0.7)" }}>
                         {ml.title || `Milestone ${mlIdx + 1}`}
                       </span>
                       {isDone && (
-                        <span className="font-mono text-[9px] tracking-widest text-[#c8f04c]/60 border border-[#c8f04c]/30 px-1.5 py-0.5 rounded">DONE</span>
+                        <span className="font-mono text-[9px] tracking-widest px-1.5 py-0.5 rounded" style={{ color: `${accentColor}99`, border: `1px solid ${accentColor}4D` }}>DONE</span>
                       )}
                       {allStreaks.length > 0 && (
                         <button
                           onClick={() => { setConnectingIdx(isOpen ? null : mlIdx); setSearchQuery(""); }}
-                          className={`ml-auto flex items-center gap-1 font-mono text-[9px] tracking-widest transition-colors px-2 py-1 rounded-lg border cursor-pointer ${
-                            isOpen
-                              ? "border-[#c8f04c]/40 text-[#c8f04c] bg-[#c8f04c]/10"
-                              : "border-white/10 text-white/30 hover:text-white/60 hover:border-white/20"
-                          }`}
+                          className="ml-auto flex items-center gap-1 font-mono text-[9px] tracking-widest transition-colors px-2 py-1 rounded-lg border cursor-pointer"
+                          style={isOpen ? { borderColor: `${accentColor}66`, color: accentColor, backgroundColor: `${accentColor}1A` } : { borderColor: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.3)" }}
+                          onMouseEnter={(e) => {
+                            if (!isOpen) {
+                              e.currentTarget.style.color = "rgba(255,255,255,0.6)";
+                              e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isOpen) {
+                              e.currentTarget.style.color = "rgba(255,255,255,0.3)";
+                              e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)";
+                            }
+                          }}
                         >
                           <Link2 size={9} />
                           {isOpen ? "DONE" : "CONNECT"}
@@ -679,7 +721,7 @@ function RoadmapView({ mission, onBack, onUpdate, allStreaks }) {
                                 >
                                   <div
                                     className="w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all"
-                                    style={{ background: checked ? "#c8f04c" : "transparent", borderColor: checked ? "#c8f04c" : "rgba(255,255,255,0.2)" }}
+                                    style={{ background: checked ? accentColor : "transparent", borderColor: checked ? accentColor : "rgba(255,255,255,0.2)" }}
                                   >
                                     {checked && <Check size={10} style={{ color: "#0d0d0d" }} strokeWidth={3} />}
                                   </div>
