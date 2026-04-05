@@ -61,21 +61,21 @@ function isScheduledToday(scheduledDays) {
   return scheduledDays.includes(getTodayDow());
 }
 
-function getFlameColor(count) {
-  if (count >= 50) return "#c8f04c";
+function getFlameColor(count, accentColor) {
+  if (count >= 50) return accentColor;
   if (count >= 21) return "#ef4444";
   if (count >= 11) return "#f97316";
   if (count >= 3)  return "#eab308";
   return "#6b7280";
 }
 
-function getPriorityColor(priority) {
+function getPriorityColor(priority, accentColor) {
   switch (priority) {
     case "critical": return "#ef4444";
     case "high":     return "#f97316";
     case "medium":   return "#eab308";
     case "low":      return "#6b7280";
-    default:         return "#c8f04c";
+    default:         return accentColor;
   }
 }
 
@@ -86,14 +86,21 @@ function formatTime(iso) {
   return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 // ── Life Score Ring ───────────────────────────────────────────────────────────
 
-function LifeScoreRing({ score, isComplete }) {
+function LifeScoreRing({ score, isComplete, accentColor }) {
   const radius = 50;
   const circumference = 2 * Math.PI * radius;
   const filled = (score / 100) * circumference;
-  const color = isComplete ? "#c8f04c"
-    : score >= 75 ? "#c8f04c"
+  const color = isComplete ? accentColor
+    : score >= 75 ? accentColor
     : score >= 50 ? "#eab308"
     : score >= 25 ? "#f97316"
     : "#6b7280";
@@ -291,14 +298,14 @@ export default function Dashboard() {
               </div>
               {isComplete && (
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
-                  style={{ background: "rgba(200,240,76,0.08)", border: "1px solid rgba(200,240,76,0.2)" }}>
+                  style={{ background: hexToRgba(accentColor, 0.08), border: `1px solid ${hexToRgba(accentColor, 0.2)}` }}>
                   <Award size={12} style={{ color: accentColor }} />
                   <span className="font-mono text-[10px] tracking-widest mt-0.5" style={{ color: accentColor }}>PERFECT DAY</span>
                 </div>
               )}
             </div>
             <div className="flex items-center gap-8">
-              <LifeScoreRing score={lifeScore} isComplete={isComplete} />
+              <LifeScoreRing score={lifeScore} isComplete={isComplete} accentColor={accentColor} />
               <div className="flex-1 space-y-4">
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
@@ -343,7 +350,7 @@ export default function Dashboard() {
                 const spinning = checkingIn === streak.id;
                 return (
                   <div key={streak.id} className="flex items-center gap-3 py-2.5 border-b border-white/4 last:border-none">
-                    <Flame size={10} style={{ color: getFlameColor(streak.current_streak ?? 0), flexShrink: 0 }} />
+                    <Flame size={10} style={{ color: getFlameColor(streak.current_streak ?? 0, accentColor), flexShrink: 0 }} />
                     <div className="flex-1 min-w-0">
                       <p className="font-mono text-xs truncate"
                         style={{ color: done ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.8)" }}>
@@ -365,8 +372,8 @@ export default function Dashboard() {
                         disabled={done || !!checkingIn}
                         className="w-7 h-7 rounded-lg border flex items-center justify-center transition-all"
                         style={{
-                          background:  done ? "rgba(200,240,76,0.12)" : "rgba(255,255,255,0.06)",
-                          borderColor: done ? "rgba(200,240,76,0.4)"  : "rgba(255,255,255,0.1)",
+                          background:  done ? hexToRgba(accentColor, 0.12) : "rgba(255,255,255,0.06)",
+                          borderColor: done ? hexToRgba(accentColor, 0.4)  : "rgba(255,255,255,0.1)",
                           cursor:      done ? "default" : checkingIn ? "wait" : "pointer",
                         }}
                       >
@@ -397,7 +404,7 @@ export default function Dashboard() {
             <div className="px-5 py-2" style={{ minHeight: Math.min(missions.length, PAGE_SIZE) * 57 }}>
               {missionSlice.map((mission) => {
                 const progress = Math.round(mission.progress ?? 0);
-                const color    = getPriorityColor(mission.priority);
+                const color    = getPriorityColor(mission.priority, accentColor);
                 const total    = mission.milestones?.length ?? 0;
                 const done     = mission.milestones?.filter(m => m.completed).length ?? 0;
                 return (
@@ -432,7 +439,7 @@ export default function Dashboard() {
                 const hasTitle = journal.title?.trim().length > 0;
                 return (
                   <div key={journal.id} className="flex items-center gap-3 py-3 border-b border-white/4 last:border-none">
-                    <div className="w-0.5 self-stretch rounded-full shrink-0" style={{ background: "rgba(200,240,76,0.2)" }} />
+                    <div className="w-0.5 self-stretch rounded-full shrink-0" style={{ background: hexToRgba(accentColor, 0.2) }} />
                     <div className="flex-1 min-w-0">
                       <p className="font-mono text-xs text-white truncate">
                         {hasTitle ? journal.title : <span className="text-white/30 italic">Untitled</span>}
