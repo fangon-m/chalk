@@ -40,21 +40,21 @@ function formatSchedule(scheduledDays) {
   return scheduledDays.slice().sort((a, b) => a - b).map(d => DAYS[d].label).join(", ");
 }
 
-function getFlameColor(count) {
-  if (count >= 50) return "#c8f04c";
+function getFlameColor(count, accentColor) {
+  if (count >= 50) return accentColor;
   if (count >= 21) return "#ef4444";
   if (count >= 11) return "#f97316";
   if (count >= 3)  return "#eab308";
   return "#6b7280";
 }
 
-function getPriorityColor(priority) {
+function getPriorityColor(priority, accentColor) {
   switch (priority) {
     case "critical": return "#ef4444";
     case "high":     return "#f97316";
     case "medium":   return "#eab308";
     case "low":      return "#6b7280";
-    default:         return "#c8f04c";
+    default:         return accentColor;
   }
 }
 
@@ -281,7 +281,8 @@ function ConnectedMissions({ streakId }) {
   return (
     <div className="flex flex-col gap-2 pt-1">
       {missions.map((mission) => {
-        const color = getPriorityColor(mission.priority);
+        const { accentColor } = useSettings();
+        const color = getPriorityColor(mission.priority, accentColor);
         const progress = mission.progress ?? 0;
         return (
           <div key={mission.id} className="flex items-center gap-2.5 rounded-lg overflow-hidden"
@@ -417,7 +418,7 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn, accentCol
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <div className="flex items-center gap-1 text-white/25" style={{ width: 80 }}>
-              <Flame size={11} style={{ color: getFlameColor(streak.current_streak ?? 0), flexShrink: 0 }} />
+              <Flame size={11} style={{ color: getFlameColor(streak.current_streak ?? 0, accentColor), flexShrink: 0 }} />
               <span className="font-mono text-[10px] truncate">{streak.current_streak ?? 0} day{streak.current_streak !== 1 ? "s" : ""}</span>
             </div>
             <div className="flex items-center gap-1 text-white/25 -ml-2 mr-2" style={{ width: 72 }}>
