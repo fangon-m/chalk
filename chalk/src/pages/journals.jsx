@@ -554,7 +554,7 @@ function JournalCard({ journal, folders, onEdit, onSoftDelete, onMove, onDragSta
         onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; onDragStart(journal.id); }}
         onDragEnd={onDragEnd}
       >
-        <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{ background: `${accentColor}40` }} />
+        <div className="absolute left-0 top-0 bottom-0 w-0.5"/>
         <div className="px-5 py-4 pl-6">
           <div className="flex items-start justify-between gap-3 mb-2">
             <h3 className="font-mono text-sm text-white leading-snug flex-1 min-w-0 truncate">

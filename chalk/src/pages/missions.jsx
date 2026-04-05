@@ -31,16 +31,24 @@ function ProgressBar({ value, size = "md" }) {
   );
 }
 
-function PriorityBadge({ priority }) {
+function PriorityBadge({ priority, accentColor }) {
   const labels = ["", "HIGH", "MED", "LOW"];
   const colors = [
     "",
-    "text-[#c8f04c] border-[#c8f04c]/40 bg-[#c8f04c]/10",
     "text-amber-400 border-amber-400/40 bg-amber-400/10",
     "text-zinc-400 border-zinc-400/40 bg-zinc-400/10",
   ];
+  
+  if (priority === 1 && accentColor) {
+    return (
+      <span className="text-[9px] font-mono tracking-widest border px-1.5 py-0.5 rounded" style={{ color: accentColor, borderColor: `${accentColor}66`, background: `${accentColor}1a` }}>
+        {labels[priority]}
+      </span>
+    );
+  }
+  
   return (
-    <span className={`text-[9px] font-mono tracking-widest border px-1.5 py-0.5 rounded ${colors[priority] || colors[3]}`}>
+    <span className={`text-[9px] font-mono tracking-widest border px-1.5 py-0.5 rounded ${colors[priority] || colors[2]}`}>
       {labels[priority] || "—"}
     </span>
   );
@@ -483,6 +491,7 @@ function MissionModal({ mission, onClose, onSave, streaks, missions, onStreakCre
 // ── Roadmap View ──────────────────────────────────────────────────────────────
 
 function RoadmapView({ mission, onBack, onUpdate, allStreaks }) {
+  const { accentColor } = useSettings();
   const [milestones, setMilestones] = useState(mission.milestones || []);
   const [connectingIdx, setConnectingIdx] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -562,7 +571,7 @@ function RoadmapView({ mission, onBack, onUpdate, allStreaks }) {
             <h2 className="text-xl font-mono text-white mb-1">{mission.title}</h2>
             <p className="text-white/40 text-sm">{mission.description}</p>
           </div>
-          <PriorityBadge priority={mission.priority} />
+          <PriorityBadge priority={mission.priority} accentColor={accentColor} />
         </div>
         <div className="flex items-center gap-3 mt-4">
           <div className="flex-1"><ProgressBar value={displayProgress} /></div>
@@ -728,11 +737,11 @@ function MissionCard({ mission, index, onSelect, onEdit, onDelete, dragging, onD
       <div className="px-5 py-4 pl-6">
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-start gap-3 flex-1 min-w-0">
-            <GripVertical size={14} className="text-white/15 group-hover:text-white/30 shrink-0 mt-0.5 transition-colors cursor-grab" />
+            <GripVertical size={14} className="text-white/15 group-hover:text-white/30 shrink-0 mt-1 transition-colors cursor-grab" />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                 <h3 className="font-mono text-sm text-white truncate">{mission.title}</h3>
-                <PriorityBadge priority={mission.priority} />
+                <PriorityBadge priority={mission.priority} accentColor={accentColor} />
               </div>
               <p className="text-white/30 text-xs font-mono truncate">{mission.description}</p>
             </div>
@@ -977,7 +986,7 @@ export default function Missions() {
                   </button>
                 </div>
                 <div className="flex items-center gap-2 text-white/25 font-mono text-[10px] tracking-widest">
-                  <GripVertical size={11} /><span>DRAG TO REPRIORITIZE</span>
+                  <GripVertical size={12} className="-mt-0.5" /><span>DRAG TO REPRIORITIZE</span>
                 </div>
               </div>
             )}
