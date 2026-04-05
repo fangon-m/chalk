@@ -67,9 +67,11 @@ export async function getStreakLogs(streakId) {
 
 // ── APP INIT ──────────────────────────────────────────────────────────────────
 
+// Note: handle_missed_streaks is intentionally excluded here.
+// It is called once per day inside Streaks.jsx with a localStorage guard
+// to prevent double-deduction of shields on missed streaks.
 export async function initStreaks() {
   await supabase.rpc("recharge_shields");
-  await supabase.rpc("handle_missed_streaks");
 }
 
 // ── MILESTONE CONNECTIONS ─────────────────────────────────────────────────────
