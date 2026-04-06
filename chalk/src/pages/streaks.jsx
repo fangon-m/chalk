@@ -48,13 +48,13 @@ function getFlameColor(count, accentColor) {
   return "#6b7280";
 }
 
-function getPriorityColor(priority, accentColor) {
+function getPriorityColor(priority) {
   switch (priority) {
     case "critical": return "#ef4444";
     case "high":     return "#f97316";
     case "medium":   return "#eab308";
     case "low":      return "#6b7280";
-    default:         return accentColor;
+    default:         return "#6b7280";
   }
 }
 
@@ -281,8 +281,8 @@ function ConnectedMissions({ streakId }) {
   return (
     <div className="flex flex-col gap-2 pt-1">
       {missions.map((mission) => {
-        const { accentColor } = useSettings();
-        const color = getPriorityColor(mission.priority, accentColor);
+        // getPriorityColor is a plain function, not a hook — safe to call here
+        const color = getPriorityColor(mission.priority);
         const progress = mission.progress ?? 0;
         return (
           <div key={mission.id} className="flex items-center gap-2.5 rounded-lg overflow-hidden"
@@ -332,7 +332,6 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn, accentCol
 
   const checkedToday   = streak._checkedToday ?? false;
   const scheduledToday = isScheduledToday(streak.scheduled_days);
-  // Use the global accent for scheduled streaks, gray for off-today
   const cardAccent     = scheduledToday ? accentColor : "#6b7280";
 
   async function handleExpand() {
@@ -584,7 +583,7 @@ function StreakModal({ streak, onClose, onSave, accentColor }) {
 // ── Main Streaks Page ─────────────────────────────────────────────────────────
 
 export default function Streaks() {
-  const { accentColor } = useSettings();
+  const { accentColor, hideOffToday } = useSettings(); // ← added hideOffToday
 
   const [streaks, setStreaks]             = useState([]);
   const [loading, setLoading]             = useState(true);
@@ -675,6 +674,8 @@ export default function Streaks() {
     ? enriched.filter(s => s._checkedToday)
     : enriched
         .filter(s => !s._checkedToday)
+        // ── hideOffToday: when enabled, remove off-schedule streaks from Pending ──
+        .filter(s => hideOffToday ? isScheduledToday(s.scheduled_days) : true)
         .sort((a, b) => {
           const aOff = !isScheduledToday(a.scheduled_days);
           const bOff = !isScheduledToday(b.scheduled_days);
