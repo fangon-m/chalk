@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  Settings, Palette, Flame, User, Database,
+  Settings, Palette, Flame, Database, LayoutGrid,
   AlertTriangle, X, Check, Download, Trash2, Loader2,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
@@ -33,7 +33,7 @@ function Section({ title, icon: Icon, accent = "#c8f04c", children }) {
   );
 }
 
-function ToggleRow({ label, description, value, onChange }) {
+function ToggleRow({ label, description, value, onChange, accentColor = "#c8f04c" }) {
   return (
     <div className="flex items-start justify-between gap-6">
       <div className="flex-1 min-w-0">
@@ -43,7 +43,7 @@ function ToggleRow({ label, description, value, onChange }) {
       <button
         onClick={() => onChange(!value)}
         className="shrink-0 w-10 h-6 rounded-full transition-all duration-200 relative cursor-pointer mt-0.5"
-        style={{ background: value ? "#c8f04c" : "rgba(255,255,255,0.1)" }}
+        style={{ background: value ? accentColor : "rgba(255,255,255,0.1)" }}
       >
         <div className="absolute top-1 w-4 h-4 rounded-full transition-all duration-200"
           style={{ background: value ? "#0d0d0d" : "rgba(255,255,255,0.4)", left: value ? "calc(100% - 20px)" : 4 }} />
@@ -52,7 +52,7 @@ function ToggleRow({ label, description, value, onChange }) {
   );
 }
 
-function ConfirmModal({ message, confirmLabel = "CONFIRM", danger = false, onConfirm, onCancel, loading }) {
+function ConfirmModal({ message, confirmLabel = "CONFIRM", danger = false, onConfirm, onCancel, loading, accentColor = "#c8f04c" }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center"
       style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)" }}>
@@ -65,7 +65,7 @@ function ConfirmModal({ message, confirmLabel = "CONFIRM", danger = false, onCon
           </button>
           <button onClick={onConfirm} disabled={loading}
             className="px-4 py-2 rounded-lg font-mono text-xs tracking-widest transition-all cursor-pointer flex items-center gap-2 disabled:opacity-60"
-            style={{ background: danger ? "#ef4444" : "#c8f04c", color: danger ? "white" : "#0d0d0d" }}>
+            style={{ background: danger ? "#ef4444" : accentColor, color: danger ? "white" : "#0d0d0d" }}>
             {loading && <Loader2 size={11} className="animate-spin" />}
             {confirmLabel}
           </button>
@@ -91,8 +91,8 @@ export default function SettingsPage() {
   const [displayName, setDisplayName]   = useState("");
   const [hideOffToday, setHideOffToday] = useState(false);
   const [compactMode, setCompactMode]   = useState(false);
+  const [kanbanMode, setKanbanMode]     = useState(false);
 
-  // Load settings from Supabase
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -113,6 +113,7 @@ export default function SettingsPage() {
         setDisplayName(data.display_name || "");
         setHideOffToday(data.hide_off_today ?? false);
         setCompactMode(data.compact_mode ?? false);
+        setKanbanMode(data.kanban_mode ?? false);
       }
     } catch (e) {
       setPageError(e.message);
@@ -123,7 +124,6 @@ export default function SettingsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Upsert settings
   async function persist(patch) {
     if (!userId) return;
     setSaving(true);
@@ -136,14 +136,16 @@ export default function SettingsPage() {
           display_name:  displayName,
           hide_off_today: hideOffToday,
           compact_mode:  compactMode,
+          kanban_mode:   kanbanMode,
           updated_at:    new Date().toISOString(),
           ...patch,
         }, { onConflict: "user_id" });
       if (error) throw error;
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-      // Broadcast so other pages can react
-      window.dispatchEvent(new CustomEvent("chalk:settings", { detail: { accentColor, displayName, hideOffToday, compactMode, ...patch } }));
+      window.dispatchEvent(new CustomEvent("chalk:settings", {
+        detail: { accentColor, displayName, hideOffToday, compactMode, kanbanMode, ...patch },
+      }));
     } catch (e) {
       setPageError(e.message);
     } finally {
@@ -159,10 +161,6 @@ export default function SettingsPage() {
   function handleToggle(key, setter, value) {
     setter(value);
     persist({ [key]: value });
-  }
-
-  async function handleSaveName() {
-    persist({ display_name: displayName });
   }
 
   async function handleExport() {
@@ -279,7 +277,6 @@ export default function SettingsPage() {
 
         {/* ── Appearance ── */}
         <Section title="Appearance" icon={Palette} accent={accentColor}>
-          {/* Accent color */}
           <div>
             <label className="block font-mono text-[10px] tracking-widest text-white/40 uppercase mb-3">
               Accent Color
@@ -303,7 +300,6 @@ export default function SettingsPage() {
                   )}
                 </button>
               ))}
-              {/* Custom color */}
               <label
                 title="Custom color"
                 className="w-8 h-8 rounded-lg cursor-pointer flex items-center justify-center transition-all relative overflow-hidden"
@@ -329,12 +325,23 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Compact mode */}
           <ToggleRow
             label="Compact Mode"
             description="Reduces spacing and padding throughout the app for a denser layout."
             value={compactMode}
             onChange={v => handleToggle("compact_mode", setCompactMode, v)}
+            accentColor={accentColor}
+          />
+        </Section>
+
+        {/* ── Layout ── */}
+        <Section title="Layout" icon={LayoutGrid} accent={accentColor}>
+          <ToggleRow
+            label="Kanban Mode"
+            description="Streaks are grouped by scheduled day. Missions are grouped by priority (High / Med / Low). Toggle also appears on each page."
+            value={kanbanMode}
+            onChange={v => handleToggle("kanban_mode", setKanbanMode, v)}
+            accentColor={accentColor}
           />
         </Section>
 
@@ -345,12 +352,12 @@ export default function SettingsPage() {
             description="In the Pending tab, streaks that aren't scheduled today are hidden instead of shown grayed out."
             value={hideOffToday}
             onChange={v => handleToggle("hide_off_today", setHideOffToday, v)}
+            accentColor={accentColor}
           />
         </Section>
 
         {/* ── Data ── */}
         <Section title="Data" icon={Database} accent={accentColor}>
-          {/* Export */}
           <div>
             <p className="font-mono text-sm text-white mb-0.5">Export Data</p>
             <p className="font-mono text-[10px] text-white/30 leading-relaxed mb-3">
@@ -369,7 +376,6 @@ export default function SettingsPage() {
 
           <div className="h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
 
-          {/* Delete streaks */}
           <div>
             <p className="font-mono text-sm text-white mb-0.5">Delete All Streaks</p>
             <p className="font-mono text-[10px] text-white/30 leading-relaxed mb-3">
@@ -385,7 +391,6 @@ export default function SettingsPage() {
             </button>
           </div>
 
-          {/* Delete everything */}
           <div>
             <p className="font-mono text-sm text-white mb-0.5">Delete All Data</p>
             <p className="font-mono text-[10px] text-white/30 leading-relaxed mb-3">
@@ -404,25 +409,26 @@ export default function SettingsPage() {
 
       </div>
 
-      {/* Confirm modals */}
       {confirmModal === "streaks" && (
         <ConfirmModal
-          message='Delete all streaks and their check-in history? This cannot be undone.'
+          message="Delete all streaks and their check-in history? This cannot be undone."
           confirmLabel="DELETE STREAKS"
           danger
           loading={deleting}
           onConfirm={handleDeleteStreaks}
           onCancel={() => setConfirmModal(null)}
+          accentColor={accentColor}
         />
       )}
       {confirmModal === "all" && (
         <ConfirmModal
-          message='Delete ALL data — streaks, missions, milestones, and journals? This is permanent and cannot be undone.'
+          message="Delete ALL data — streaks, missions, milestones, and journals? This is permanent and cannot be undone."
           confirmLabel="DELETE EVERYTHING"
           danger
           loading={deleting}
           onConfirm={handleDeleteAll}
           onCancel={() => setConfirmModal(null)}
+          accentColor={accentColor}
         />
       )}
     </div>
