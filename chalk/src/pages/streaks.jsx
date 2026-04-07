@@ -465,25 +465,6 @@ function StreakModal({ streak, onClose, onSave, accentColor }) {
   );
 }
 
-// ── View Toggle ───────────────────────────────────────────────────────────────
-
-function ViewToggle({ kanban, onToggle, accentColor }) {
-  return (
-    <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: "#111" }}>
-      <button onClick={() => onToggle(false)}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all cursor-pointer"
-        style={{ background: !kanban ? accentColor : "transparent", color: !kanban ? "#0d0d0d" : "rgba(255,255,255,0.3)" }}>
-        <List size={11} /> LIST
-      </button>
-      <button onClick={() => onToggle(true)}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all cursor-pointer"
-        style={{ background: kanban ? accentColor : "transparent", color: kanban ? "#0d0d0d" : "rgba(255,255,255,0.3)" }}>
-        <LayoutGrid size={11} /> KANBAN
-      </button>
-    </div>
-  );
-}
-
 // ── Main Streaks Page ─────────────────────────────────────────────────────────
 
 export default function Streaks() {
@@ -610,7 +591,6 @@ export default function Streaks() {
                   </button>
                 </div>
               )}
-              <ViewToggle kanban={kanban} onToggle={v => setLocalKanban(v === globalKanban ? null : v)} accentColor={accentColor} />
             </div>
             {!kanban && (
               <div className="font-mono text-[10px] tracking-widest text-white/25">{doneCount} / {scheduledCount} CHECKED IN</div>
