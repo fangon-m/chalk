@@ -1,10 +1,20 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
-const SettingsContext = createContext({ accentColor: "#c8f04c" });
+const SettingsContext = createContext({
+  accentColor:  "#c8f04c",
+  compactMode:  false,
+  hideOffToday: false,
+  kanbanMode:   false,
+});
 
 export function SettingsProvider({ children }) {
-  const [settings, setSettings] = useState({ accentColor: "#c8f04c", compactMode: false, hideOffToday: false });
+  const [settings, setSettings] = useState({
+    accentColor:  "#c8f04c",
+    compactMode:  false,
+    hideOffToday: false,
+    kanbanMode:   false,
+  });
 
   useEffect(() => {
     async function load() {
@@ -17,21 +27,23 @@ export function SettingsProvider({ children }) {
         .maybeSingle();
       if (data) {
         setSettings({
-          accentColor:   data.accent_color   || "#c8f04c",
-          compactMode:   data.compact_mode   ?? false,
-          hideOffToday:  data.hide_off_today ?? false,
+          accentColor:  data.accent_color  || "#c8f04c",
+          compactMode:  data.compact_mode  ?? false,
+          hideOffToday: data.hide_off_today ?? false,
+          kanbanMode:   data.kanban_mode   ?? false,
         });
       }
     }
     load();
 
-    // Listen for updates broadcast by SettingsPage
     function handleUpdate(e) {
-      setSettings(prev => ({ ...prev, ...{
-        accentColor:  e.detail.accentColor,
-        compactMode:  e.detail.compactMode,
-        hideOffToday: e.detail.hideOffToday,
-      }}));
+      setSettings(prev => ({
+        ...prev,
+        accentColor:  e.detail.accentColor  ?? prev.accentColor,
+        compactMode:  e.detail.compactMode  ?? prev.compactMode,
+        hideOffToday: e.detail.hideOffToday ?? prev.hideOffToday,
+        kanbanMode:   e.detail.kanbanMode   ?? prev.kanbanMode,
+      }));
     }
     window.addEventListener("chalk:settings", handleUpdate);
     return () => window.removeEventListener("chalk:settings", handleUpdate);
