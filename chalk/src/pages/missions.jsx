@@ -459,53 +459,10 @@ function MissionCard({ mission, index, onSelect, onEdit, onDelete, dragging, onD
   );
 }
 
-// ── Kanban View ───────────────────────────────────────────────────────────────
-
-function KanbanColumn({ col, missions, onSelect, onEdit, onDelete, onDragStart, onDragEnd, accentColor }) {
-  const color = col.value === 1 ? accentColor : col.color;
-  return (
-    <div className="flex flex-col min-w-[260px] max-w-[320px] flex-1">
-      <div className="flex items-center gap-2 px-3 py-2 mb-3 rounded-xl" style={{ background: `${color}14`, border: `1px solid ${color}33` }}>
-        <div className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
-        <span className="font-mono text-[10px] tracking-widest uppercase flex-1" style={{ color }}>{col.label}</span>
-        <span className="font-mono text-[10px]" style={{ color: `${color}99` }}>{missions.length}</span>
-      </div>
-      <div className="flex flex-col gap-2 flex-1">
-        {missions.length === 0 ? (
-          <div className="rounded-xl border border-dashed px-3 py-6 text-center" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-            <p className="font-mono text-[10px] text-white/15">No missions</p>
-          </div>
-        ) : missions.map((mission, idx) => (
-          <MissionCard key={mission.id} mission={mission} index={idx} onSelect={onSelect} onEdit={onEdit} onDelete={onDelete}
-            dragging={false} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragOver={() => {}}
-            accentColor={accentColor} compact />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function MissionKanban({ missions, onSelect, onEdit, onDelete, accentColor }) {
-  return (
-    <div className="flex gap-4 overflow-x-auto pb-4" style={{ scrollSnapType: "x mandatory" }}>
-      {PRIORITY_COLUMNS.map(col => (
-        <div key={col.value} style={{ scrollSnapAlign: "start" }}>
-          <KanbanColumn col={col} missions={missions.filter(m => m.priority === col.value && m.progress < 100)}
-            onSelect={onSelect} onEdit={onEdit} onDelete={onDelete}
-            onDragStart={() => {}} onDragEnd={() => {}}
-            accentColor={accentColor} />
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function Missions() {
-  const { accentColor, kanbanMode: globalKanban } = useSettings();
-  const [localKanban, setLocalKanban] = useState(null);
-  const kanban = localKanban !== null ? localKanban : globalKanban;
+  const { accentColor} = useSettings();
 
   const [missions, setMissions] = useState([]);
   const [streaks, setStreaks]   = useState([]);
@@ -595,7 +552,7 @@ export default function Missions() {
         option { background: #111; color: white; }
       `}</style>
 
-      <div className={kanban ? "px-6 py-10" : "max-w-2xl mx-auto px-6 py-10"}>
+      <div className={selectedMission ? "px-6 py-10" : "max-w-2xl mx-auto px-6 py-10"}>
         {selectedMission ? (
           <RoadmapView mission={selectedMission} onBack={() => setSelectedMission(null)} onUpdate={handleRoadmapUpdate} allStreaks={streaks} accentColor={accentColor} />
         ) : (
@@ -618,7 +575,7 @@ export default function Missions() {
             {missions.length > 0 && (
               <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
                 <div className="flex items-center gap-3">
-                  {!kanban && (
+                  {!selectedMission && (
                     <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: "#111" }}>
                       <button onClick={() => setTab("active")} className="px-4 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all cursor-pointer"
                         style={{ background: tab === "active" ? accentColor : "transparent", color: tab === "active" ? "#0d0d0d" : "rgba(255,255,255,0.3)" }}>IN PROGRESS</button>
@@ -627,7 +584,7 @@ export default function Missions() {
                     </div>
                   )}
                 </div>
-                {!kanban && (
+                {!selectedMission && (
                   <div className="flex items-center gap-2 text-white/25 font-mono text-[10px] tracking-widest">
                     <GripVertical size={11} /><span>DRAG TO REPRIORITIZE</span>
                   </div>
@@ -642,9 +599,6 @@ export default function Missions() {
                 <p className="font-mono text-white/15 text-xs mb-6">Define what you're pursuing</p>
                 <button onClick={() => { setEditingMission(null); setModalOpen(true); }} className="px-5 py-2.5 rounded-xl font-mono text-xs tracking-widest cursor-pointer" style={{ background: accentColor, color: "#0d0d0d" }}>GET STARTED</button>
               </div>
-            ) : kanban ? (
-              // ── Kanban: columns by priority ──
-              <MissionKanban missions={activeMissions} onSelect={setSelectedMission} onEdit={m => { setEditingMission(m); setModalOpen(true); }} onDelete={handleDelete} accentColor={accentColor} />
             ) : (
               <>
                 {(tab === "active" ? activeMissions : doneMissions).length === 0 ? (
