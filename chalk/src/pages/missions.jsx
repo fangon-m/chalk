@@ -552,7 +552,7 @@ export default function Missions() {
         option { background: #111; color: white; }
       `}</style>
 
-      <div className={selectedMission ? "px-6 py-10" : "max-w-2xl mx-auto px-6 py-10"}>
+      <div className={"max-w-2xl mx-auto px-6 py-10"}>
         {selectedMission ? (
           <RoadmapView mission={selectedMission} onBack={() => setSelectedMission(null)} onUpdate={handleRoadmapUpdate} allStreaks={streaks} accentColor={accentColor} />
         ) : (
