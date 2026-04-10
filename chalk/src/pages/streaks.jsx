@@ -85,8 +85,7 @@ function DayPicker({ value, onChange, accentColor }) {
                 background: active ? `${accentColor}26` : "rgba(255,255,255,0.05)",
                 border: active ? `1px solid ${accentColor}59` : "1px solid rgba(255,255,255,0.08)",
                 color: active ? accentColor : "rgba(255,255,255,0.3)",
-              }}
-            >
+              }}>
               {day.label}
             </button>
           );
@@ -161,7 +160,10 @@ function ShieldPips({ count = 0, max = 3 }) {
   return (
     <div className="flex items-center gap-0.5">
       {Array.from({ length: max }).map((_, i) => (
-        <Shield key={i} size={12} style={{ color: i < count ? "#60a5fa" : "rgba(255,255,255,0.18)", fill: i < count ? "rgba(96,165,250,0.2)" : "none" }} />
+        <Shield key={i} size={10} style={{
+          color: i < count ? "#60a5fa" : "rgba(255,255,255,0.15)",
+          fill:  i < count ? "rgba(96,165,250,0.2)" : "none",
+        }} />
       ))}
     </div>
   );
@@ -237,9 +239,9 @@ function ConfirmModal({ message, onConfirm, onCancel }) {
   );
 }
 
-// ── Streak Card ───────────────────────────────────────────────────────────────
+// ── Streak Card (list view) ───────────────────────────────────────────────────
 
-function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn, accentColor, compact = false }) {
+function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn, accentColor }) {
   const [expanded, setExpanded] = useState(false);
   const [logs, setLogs] = useState(null);
   const [loadingLogs, setLoadingLogs] = useState(false);
@@ -262,15 +264,14 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn, accentCol
     <div className="group relative rounded-2xl border border-white/8 transition-all duration-200 overflow-hidden hover:border-white/20"
       style={{ background: "#111", opacity: scheduledToday ? 1 : 0.5 }}>
       <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-2xl" style={{ background: cardAccent }} />
-      <div className={compact ? "px-4 py-3 pl-5" : "px-5 py-4 pl-6"}>
+      <div className="px-5 py-4 pl-6">
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-start gap-3 flex-1 min-w-0">
             <button
               onClick={() => scheduledToday && !checkedToday && onCheckIn(streak.id)}
               disabled={!scheduledToday || checkedToday || checkingIn === streak.id}
               className="shrink-0 w-8 h-8 rounded-lg border flex items-center justify-center transition-all"
-              style={{ background: checkedToday ? `${cardAccent}22` : "rgba(255,255,255,0.08)", borderColor: checkedToday ? cardAccent : "rgba(255,255,255,0.1)", cursor: (!scheduledToday || checkedToday) ? "default" : "pointer" }}
-            >
+              style={{ background: checkedToday ? `${cardAccent}22` : "rgba(255,255,255,0.08)", borderColor: checkedToday ? cardAccent : "rgba(255,255,255,0.1)", cursor: (!scheduledToday || checkedToday) ? "default" : "pointer" }}>
               {checkingIn === streak.id ? <Loader2 size={14} className="animate-spin" style={{ color: cardAccent }} />
                 : checkedToday ? <CheckCircle2 size={14} style={{ color: cardAccent }} />
                 : <Check size={13} style={{ color: scheduledToday ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.15)" }} />}
@@ -303,14 +304,12 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn, accentCol
               <Zap size={10} style={{ flexShrink: 0 }} />
               <span className="font-mono text-[10px] truncate">best {streak.longest_streak ?? 0}</span>
             </div>
-            {!compact && (
-              <div className="flex items-center gap-1" style={{ width: 88 }}>
-                <CalendarDays size={10} className="text-white/25" style={{ flexShrink: 0 }} />
-                <span className="font-mono text-[10px] text-white/25 truncate">
-                  {streak.scheduled_days && streak.scheduled_days.length > 0 ? formatSchedule(streak.scheduled_days) : "Everyday"}
-                </span>
-              </div>
-            )}
+            <div className="flex items-center gap-1" style={{ width: 88 }}>
+              <CalendarDays size={10} className="text-white/25" style={{ flexShrink: 0 }} />
+              <span className="font-mono text-[10px] text-white/25 truncate">
+                {streak.scheduled_days && streak.scheduled_days.length > 0 ? formatSchedule(streak.scheduled_days) : "Everyday"}
+              </span>
+            </div>
             <div style={{ width: 52 }}><ShieldPips count={streak.shields ?? 0} /></div>
           </div>
           <button onClick={handleExpand}
@@ -342,66 +341,195 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn, accentCol
   );
 }
 
-// ── Kanban View ───────────────────────────────────────────────────────────────
+// ── Kanban Mini Card ──────────────────────────────────────────────────────────
 
-function KanbanColumn({ day, streaks, todayDow, onCheckIn, onEdit, onDelete, checkingIn, accentColor }) {
-  const isToday = day.value === todayDow;
+function KanbanStreakCard({ streak, onCheckIn, checkingIn, accentColor, onShowHistory }) {
+  const checkedToday   = streak._checkedToday ?? false;
+  const scheduledToday = isScheduledToday(streak.scheduled_days);
+  const cardAccent     = scheduledToday ? accentColor : "#6b7280";
+
   return (
-    <div className="flex flex-col min-w-[220px] max-w-[260px] flex-1">
-      {/* Column header */}
-      <div className="flex items-center gap-2 px-3 py-2 mb-3 rounded-xl"
-        style={{ background: isToday ? `${accentColor}14` : "rgba(255,255,255,0.04)", border: isToday ? `1px solid ${accentColor}33` : "1px solid rgba(255,255,255,0.06)" }}>
-        <span className="font-mono text-[10px] tracking-widest uppercase flex-1" style={{ color: isToday ? accentColor : "rgba(255,255,255,0.35)" }}>
-          {day.full}
-        </span>
-        {isToday && <span className="font-mono text-[8px] tracking-widest px-1.5 py-0.5 rounded" style={{ background: `${accentColor}26`, color: accentColor }}>TODAY</span>}
-        <span className="font-mono text-[10px]" style={{ color: isToday ? `${accentColor}99` : "rgba(255,255,255,0.2)" }}>{streaks.length}</span>
-      </div>
-      {/* Cards */}
-      <div className="flex flex-col gap-2 flex-1">
-        {streaks.length === 0 ? (
-          <div className="rounded-xl border border-dashed px-3 py-6 text-center" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-            <p className="font-mono text-[10px] text-white/15">No streaks</p>
+    <div className="relative rounded-xl border border-white/8 overflow-hidden transition-all hover:border-white/18"
+      style={{ background: "#111", opacity: scheduledToday ? 1 : 0.45 }}>
+      <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-xl" style={{ background: cardAccent }} />
+      <div className="pl-3 pr-2.5 py-2">
+        {/* Row 1: check + name */}
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <button
+            onClick={() => scheduledToday && !checkedToday && onCheckIn(streak.id)}
+            disabled={!scheduledToday || checkedToday || checkingIn === streak.id}
+            className="shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-all"
+            style={{
+              background: checkedToday ? `${cardAccent}22` : "rgba(255,255,255,0.06)",
+              borderColor: checkedToday ? cardAccent : "rgba(255,255,255,0.12)",
+              cursor: (!scheduledToday || checkedToday) ? "default" : "pointer",
+            }}>
+            {checkingIn === streak.id
+              ? <Loader2 size={8} className="animate-spin" style={{ color: cardAccent }} />
+              : checkedToday
+              ? <CheckCircle2 size={8} style={{ color: cardAccent }} />
+              : <Check size={7} style={{ color: scheduledToday ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.1)" }} />}
+          </button>
+          <span className="font-mono text-[11px] text-white/85 truncate leading-tight flex-1">{streak.name}</span>
+        </div>
+        {/* Row 2: flame count + shields + history icon */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-0.5 flex-1">
+            <Flame size={9} style={{ color: getFlameColor(streak.current_streak ?? 0, accentColor), flexShrink: 0 }} />
+            <span className="font-mono text-[9px] text-white/35">{streak.current_streak ?? 0}d</span>
           </div>
-        ) : (
-          streaks.map(streak => (
-            <StreakCard key={streak.id} streak={streak} onCheckIn={onCheckIn} onEdit={onEdit} onDelete={onDelete} checkingIn={checkingIn} accentColor={accentColor} compact />
-          ))
-        )}
+          <ShieldPips count={streak.shields ?? 0} max={3} />
+          <button
+            onClick={() => onShowHistory(streak)}
+            className="text-white/20 hover:text-white/55 transition-colors cursor-pointer ml-0.5"
+            title="View history">
+            <ChevronDown size={10} />
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-function StreakKanban({ enriched, onCheckIn, onEdit, onDelete, checkingIn, accentColor }) {
-  const todayDow = getTodayDow();
+// ── Kanban Column ─────────────────────────────────────────────────────────────
 
-  // Group streaks by each day they're scheduled for.
-  // "Everyday" streaks appear in ALL columns.
+function KanbanColumn({ day, streaks, todayDow, onCheckIn, checkingIn, accentColor, onShowHistory }) {
+  const isToday = day.value === todayDow;
+  return (
+    <div className="flex flex-col w-[152px] shrink-0">
+      {/* Header */}
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 mb-2 rounded-lg"
+        style={{
+          background: isToday ? `${accentColor}14` : "rgba(255,255,255,0.04)",
+          border: isToday ? `1px solid ${accentColor}33` : "1px solid rgba(255,255,255,0.06)",
+        }}>
+        <span className="font-mono text-[9px] tracking-widest uppercase flex-1"
+          style={{ color: isToday ? accentColor : "rgba(255,255,255,0.3)" }}>
+          {day.label}
+        </span>
+        {isToday && (
+          <span className="font-mono text-[7px] tracking-widest px-1 py-0.5 rounded"
+            style={{ background: `${accentColor}26`, color: accentColor }}>
+            TODAY
+          </span>
+        )}
+        <span className="font-mono text-[9px]"
+          style={{ color: isToday ? `${accentColor}99` : "rgba(255,255,255,0.2)" }}>
+          {streaks.length}
+        </span>
+      </div>
+      {/* Cards */}
+      <div className="flex flex-col gap-1.5 flex-1">
+        {streaks.length === 0 ? (
+          <div className="rounded-lg border border-dashed py-5 text-center" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+            <span className="font-mono text-[9px] text-white/15">—</span>
+          </div>
+        ) : streaks.map(streak => (
+          <KanbanStreakCard
+            key={streak.id}
+            streak={streak}
+            onCheckIn={onCheckIn}
+            checkingIn={checkingIn}
+            accentColor={accentColor}
+            onShowHistory={onShowHistory}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Kanban Board + History Drawer ─────────────────────────────────────────────
+
+function StreakKanban({ enriched, onCheckIn, checkingIn, accentColor, onEdit }) {
+  const todayDow = getTodayDow();
+  const [historyStreak, setHistoryStreak] = useState(null);
+  const [logs, setLogs] = useState(null);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+
+  async function handleShowHistory(streak) {
+    setHistoryStreak(streak);
+    setLogs(null);
+    setLoadingLogs(true);
+    try { const data = await getStreakLogs(streak.id); setLogs(data || []); }
+    catch { setLogs([]); } finally { setLoadingLogs(false); }
+  }
+
   function getStreaksForDay(dow) {
-    return enriched.filter(s => {
-      if (!s.scheduled_days || s.scheduled_days.length === 0) return true;
-      return s.scheduled_days.includes(dow);
-    });
+    return enriched.filter(s =>
+      !s.scheduled_days || s.scheduled_days.length === 0 || s.scheduled_days.includes(dow)
+    );
   }
 
   return (
-    <div className="flex gap-3 overflow-x-auto pb-4" style={{ scrollSnapType: "x mandatory" }}>
-      {DAYS.map(day => (
-        <div key={day.value} style={{ scrollSnapAlign: "start" }}>
-          <KanbanColumn
-            day={day}
-            streaks={getStreaksForDay(day.value)}
-            todayDow={todayDow}
-            onCheckIn={onCheckIn}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            checkingIn={checkingIn}
-            accentColor={accentColor}
-          />
+    <>
+      {/* Board */}
+      <div className="flex gap-2 overflow-x-auto pb-3" style={{ scrollSnapType: "x mandatory" }}>
+        {DAYS.map(day => (
+          <div key={day.value} style={{ scrollSnapAlign: "start" }}>
+            <KanbanColumn
+              day={day}
+              streaks={getStreaksForDay(day.value)}
+              todayDow={todayDow}
+              onCheckIn={onCheckIn}
+              checkingIn={checkingIn}
+              accentColor={accentColor}
+              onShowHistory={handleShowHistory}
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* History drawer */}
+      {historyStreak && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center"
+          style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}
+          onClick={() => setHistoryStreak(null)}>
+          <div
+            className="w-full max-w-2xl mx-4 mb-6 rounded-2xl border border-white/10 overflow-hidden"
+            style={{ background: "#111" }}
+            onClick={e => e.stopPropagation()}>
+            {/* Drawer header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
+              <div className="flex items-center gap-2.5">
+                <Flame size={12} style={{ color: getFlameColor(historyStreak.current_streak ?? 0, accentColor) }} />
+                <span className="font-mono text-sm text-white">{historyStreak.name}</span>
+                <span className="font-mono text-[10px] text-white/30">{historyStreak.current_streak ?? 0}d streak</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => { setHistoryStreak(null); onEdit(historyStreak); }}
+                  className="p-1.5 rounded-lg hover:bg-white/8 text-white/30 hover:text-white/70 transition-all cursor-pointer">
+                  <Pencil size={12} />
+                </button>
+                <button
+                  onClick={() => setHistoryStreak(null)}
+                  className="text-white/30 hover:text-white/70 transition-colors cursor-pointer">
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+            {/* Calendar */}
+            <div className="px-5 py-4">
+              {loadingLogs ? (
+                <div className="flex items-center gap-2 text-white/25">
+                  <Loader2 size={12} className="animate-spin" />
+                  <span className="font-mono text-[10px]">Loading...</span>
+                </div>
+              ) : (
+                <CalendarStrip
+                  logs={logs || []}
+                  scheduledDays={historyStreak.scheduled_days}
+                  createdAt={historyStreak.created_at}
+                  accentColor={accentColor}
+                />
+              )}
+            </div>
+          </div>
         </div>
-      ))}
-    </div>
+      )}
+    </>
   );
 }
 
@@ -465,13 +593,30 @@ function StreakModal({ streak, onClose, onSave, accentColor }) {
   );
 }
 
+// ── View Toggle ───────────────────────────────────────────────────────────────
+
+function ViewToggle({ kanban, onToggle, accentColor }) {
+  return (
+    <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: "#111" }}>
+      <button onClick={() => onToggle(false)}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all cursor-pointer"
+        style={{ background: !kanban ? accentColor : "transparent", color: !kanban ? "#0d0d0d" : "rgba(255,255,255,0.3)" }}>
+        <List size={11} /> LIST
+      </button>
+      <button onClick={() => onToggle(true)}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all cursor-pointer"
+        style={{ background: kanban ? accentColor : "transparent", color: kanban ? "#0d0d0d" : "rgba(255,255,255,0.3)" }}>
+        <LayoutGrid size={11} /> KANBAN
+      </button>
+    </div>
+  );
+}
+
 // ── Main Streaks Page ─────────────────────────────────────────────────────────
 
 export default function Streaks() {
   const { accentColor, hideOffToday, kanbanMode: globalKanban } = useSettings();
-  const [localKanban, setLocalKanban] = useState(null); // null = follow global
-
-  // Effective kanban: local override takes priority over global setting
+  const [localKanban, setLocalKanban] = useState(null);
   const kanban = localKanban !== null ? localKanban : globalKanban;
 
   const [streaks, setStreaks]             = useState([]);
@@ -553,7 +698,7 @@ export default function Streaks() {
         option { background: #111; color: white; }
       `}</style>
 
-      <div className={kanban ? "px-6 py-10" : "max-w-2xl mx-auto px-6 py-10"}>
+      <div className="max-w-2xl mx-auto px-6 py-10">
 
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -576,7 +721,6 @@ export default function Streaks() {
         {totalCount > 0 && (
           <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
             <div className="flex items-center gap-3">
-              {/* List/tab switcher — hidden in kanban mode */}
               {!kanban && (
                 <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: "#111" }}>
                   <button onClick={() => setTab("active")}
@@ -591,6 +735,7 @@ export default function Streaks() {
                   </button>
                 </div>
               )}
+              <ViewToggle kanban={kanban} onToggle={v => setLocalKanban(v === globalKanban ? null : v)} accentColor={accentColor} />
             </div>
             {!kanban && (
               <div className="font-mono text-[10px] tracking-widest text-white/25">{doneCount} / {scheduledCount} CHECKED IN</div>
@@ -614,8 +759,13 @@ export default function Streaks() {
             <button onClick={() => { setEditingStreak(null); setShowModal(true); }} className="px-5 py-2.5 rounded-xl font-mono text-xs tracking-widest cursor-pointer" style={{ background: accentColor, color: "#0d0d0d" }}>GET STARTED</button>
           </div>
         ) : kanban ? (
-          // ── Kanban: columns by day ──
-          <StreakKanban enriched={enriched} onCheckIn={handleCheckIn} onEdit={s => { setEditingStreak(s); setShowModal(true); }} onDelete={handleDelete} checkingIn={checkingIn} accentColor={accentColor} />
+          <StreakKanban
+            enriched={enriched}
+            onCheckIn={handleCheckIn}
+            checkingIn={checkingIn}
+            accentColor={accentColor}
+            onEdit={s => { setEditingStreak(s); setShowModal(true); }}
+          />
         ) : filtered.length === 0 ? (
           <div className="text-center py-24">
             <p className="font-mono text-white/20 text-xs tracking-widest mb-2">{tab === "done" ? "NOTHING CHECKED IN YET TODAY" : "ALL DONE FOR TODAY!"}</p>
