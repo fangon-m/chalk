@@ -419,7 +419,7 @@ function KanbanColumn({ day, streaks, todayDow, onCheckIn, checkingIn, accentCol
         </span>
       </div>
       {/* Cards */}
-      <div className="flex flex-col gap-1.5 flex-1">
+      <div className="flex flex-col gap-1.5">
         {streaks.length === 0 ? (
           <div className="rounded-lg border border-dashed py-5 text-center" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
             <span className="font-mono text-[9px] text-white/15">—</span>
@@ -464,7 +464,7 @@ function StreakKanban({ enriched, onCheckIn, checkingIn, accentColor, onEdit }) 
   return (
     <>
       {/* Board */}
-      <div className="flex gap-2 overflow-x-auto pb-3" style={{ scrollSnapType: "x mandatory" }}>
+      <div className="flex items-start justify-center gap-2 overflow-x-auto pb-3" style={{ scrollSnapType: "x mandatory" }}>
         {DAYS.map(day => (
           <div key={day.value} style={{ scrollSnapAlign: "start" }}>
             <KanbanColumn
@@ -593,8 +593,6 @@ function StreakModal({ streak, onClose, onSave, accentColor }) {
   );
 }
 
-
-
 // ── Main Streaks Page ─────────────────────────────────────────────────────────
 
 export default function Streaks() {
@@ -681,9 +679,8 @@ export default function Streaks() {
         option { background: #111; color: white; }
       `}</style>
 
-      <div className="max-w-2xl mx-auto px-6 py-10">
-
-        {/* Header */}
+      {/* Header + controls — always constrained */}
+      <div className="max-w-2xl mx-auto px-6 pt-10">
         <div className="flex items-center justify-between mb-8">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -732,15 +729,18 @@ export default function Streaks() {
             <button onClick={() => setPageError("")} className="text-red-400/60 hover:text-red-400 transition-colors cursor-pointer"><X size={13} /></button>
           </div>
         )}
+      </div>
 
-        {totalCount === 0 ? (
-          <div className="text-center py-24">
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/8" style={{ background: "#111" }}><Flame size={22} className="text-white/20" /></div>
-            <p className="font-mono text-white/30 text-sm mb-1">No streaks yet</p>
-            <p className="font-mono text-white/15 text-xs mb-6">Start building daily habits</p>
-            <button onClick={() => { setEditingStreak(null); setShowModal(true); }} className="px-5 py-2.5 rounded-xl font-mono text-xs tracking-widest cursor-pointer" style={{ background: accentColor, color: "#0d0d0d" }}>GET STARTED</button>
-          </div>
-        ) : kanban ? (
+      {/* Content — kanban uses full width, list stays constrained */}
+      {totalCount === 0 ? (
+        <div className="max-w-2xl mx-auto px-6 pb-10 text-center py-24">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/8" style={{ background: "#111" }}><Flame size={22} className="text-white/20" /></div>
+          <p className="font-mono text-white/30 text-sm mb-1">No streaks yet</p>
+          <p className="font-mono text-white/15 text-xs mb-6">Start building daily habits</p>
+          <button onClick={() => { setEditingStreak(null); setShowModal(true); }} className="px-5 py-2.5 rounded-xl font-mono text-xs tracking-widest cursor-pointer" style={{ background: accentColor, color: "#0d0d0d" }}>GET STARTED</button>
+        </div>
+      ) : kanban ? (
+        <div className="px-6 pb-10">
           <StreakKanban
             enriched={enriched}
             onCheckIn={handleCheckIn}
@@ -748,26 +748,29 @@ export default function Streaks() {
             accentColor={accentColor}
             onEdit={s => { setEditingStreak(s); setShowModal(true); }}
           />
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-24">
-            <p className="font-mono text-white/20 text-xs tracking-widest mb-2">{tab === "done" ? "NOTHING CHECKED IN YET TODAY" : "ALL DONE FOR TODAY!"}</p>
-            <p className="font-mono text-white/40 text-sm">{tab === "done" ? '"Small steps, every day."' : '"Give yourself some credit!"'}</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {filtered.map(streak => (
-              <StreakCard key={streak.id} streak={streak} onCheckIn={handleCheckIn} onEdit={s => { setEditingStreak(s); setShowModal(true); }} onDelete={handleDelete} checkingIn={checkingIn} accentColor={accentColor} />
-            ))}
-          </div>
-        )}
-
-        {totalCount > 0 && !kanban && (
-          <div className="mt-6 flex items-center gap-2 px-4 py-3 rounded-xl border border-blue-400/15 bg-blue-400/5">
-            <Shield size={13} className="text-blue-400 shrink-0" />
-            <span className="font-mono text-[10px] text-white/30 tracking-wide">Shields only deduct on missed scheduled days.</span>
-          </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="max-w-2xl mx-auto px-6 pb-10">
+          {filtered.length === 0 ? (
+            <div className="text-center py-24">
+              <p className="font-mono text-white/20 text-xs tracking-widest mb-2">{tab === "done" ? "NOTHING CHECKED IN YET TODAY" : "ALL DONE FOR TODAY!"}</p>
+              <p className="font-mono text-white/40 text-sm">{tab === "done" ? '"Small steps, every day."' : '"Give yourself some credit!"' }</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filtered.map(streak => (
+                <StreakCard key={streak.id} streak={streak} onCheckIn={handleCheckIn} onEdit={s => { setEditingStreak(s); setShowModal(true); }} onDelete={handleDelete} checkingIn={checkingIn} accentColor={accentColor} />
+              ))}
+            </div>
+          )}
+          {totalCount > 0 && (
+            <div className="mt-6 flex items-center gap-2 px-4 py-3 rounded-xl border border-blue-400/15 bg-blue-400/5">
+              <Shield size={13} className="text-blue-400 shrink-0" />
+              <span className="font-mono text-[10px] text-white/30 tracking-wide">Shields only deduct on missed scheduled days.</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {showModal && (
         <StreakModal streak={editingStreak} onClose={() => { setShowModal(false); setEditingStreak(null); }} onSave={() => { setShowModal(false); setEditingStreak(null); load(); }} accentColor={accentColor} />
