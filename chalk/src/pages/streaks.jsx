@@ -263,7 +263,6 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn, accentCol
   return (
     <div className="group relative rounded-2xl border border-white/8 transition-all duration-200 overflow-hidden hover:border-white/20"
       style={{ background: "#111", opacity: scheduledToday ? 1 : 0.5 }}>
-      <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-2xl" style={{ background: cardAccent }} />
       <div className="px-5 py-4 pl-6">
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -351,7 +350,6 @@ function KanbanStreakCard({ streak, onCheckIn, checkingIn, accentColor, onShowHi
   return (
     <div className="relative rounded-xl border border-white/8 overflow-hidden transition-all hover:border-white/18"
       style={{ background: "#111", opacity: scheduledToday ? 1 : 0.45 }}>
-      <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-xl" style={{ background: cardAccent }} />
       <div className="pl-3 pr-2.5 py-2">
         {/* Row 1: check + name */}
         <div className="flex items-center gap-1.5 mb-1.5">
@@ -396,9 +394,10 @@ function KanbanStreakCard({ streak, onCheckIn, checkingIn, accentColor, onShowHi
 function KanbanColumn({ day, streaks, todayDow, onCheckIn, checkingIn, accentColor, onShowHistory }) {
   const isToday = day.value === todayDow;
   return (
-    <div className="flex flex-col w-[152px] shrink-0">
-      {/* Header */}
-      <div className="flex items-center gap-1.5 px-2.5 py-1.5 mb-2 rounded-lg"
+    <div className="rounded-xl border border-white/10 p-2.5 shrink-0" style={{ background: "#111", width: 180 }}>
+      <div className="flex flex-col h-full">
+        {/* Header */}
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 mb-2 rounded-lg"
         style={{
           background: isToday ? `${accentColor}14` : "rgba(255,255,255,0.04)",
           border: isToday ? `1px solid ${accentColor}33` : "1px solid rgba(255,255,255,0.06)",
@@ -434,6 +433,7 @@ function KanbanColumn({ day, streaks, todayDow, onCheckIn, checkingIn, accentCol
             onShowHistory={onShowHistory}
           />
         ))}
+      </div>
       </div>
     </div>
   );
