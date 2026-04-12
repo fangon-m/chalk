@@ -742,7 +742,6 @@ export default function Streaks() {
                     DONE TODAY
                   </button>
                 </div>
-                <ViewToggle kanban={kanban} onToggle={v => setLocalKanban(v === globalKanban ? null : v)} accentColor={accentColor} />
               </div>
               <div className="font-mono text-[10px] tracking-widest text-white/25">{doneCount} / {scheduledCount} CHECKED IN</div>
             </div>

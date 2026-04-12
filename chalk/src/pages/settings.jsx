@@ -131,20 +131,36 @@ export default function SettingsPage() {
       const { error } = await supabase
         .from("user_settings")
         .upsert({
-          user_id:       userId,
-          accent_color:  accentColor,
-          display_name:  displayName,
+          user_id:        userId,
+          accent_color:   accentColor,
+          display_name:   displayName,
           hide_off_today: hideOffToday,
-          compact_mode:  compactMode,
-          kanban_mode:   kanbanMode,
-          updated_at:    new Date().toISOString(),
+          compact_mode:   compactMode,
+          kanban_mode:    kanbanMode,
+          updated_at:     new Date().toISOString(),
           ...patch,
         }, { onConflict: "user_id" });
       if (error) throw error;
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
+
+      // Translate DB snake_case patch keys to camelCase so the event
+      // always carries the true new value, not the stale closure value.
+      const keyMap = {
+        accent_color:   "accentColor",
+        compact_mode:   "compactMode",
+        hide_off_today: "hideOffToday",
+        kanban_mode:    "kanbanMode",
+        display_name:   "displayName",
+      };
+      const patchCamel = Object.fromEntries(
+        Object.entries(patch).map(([k, v]) => [keyMap[k] ?? k, v])
+      );
       window.dispatchEvent(new CustomEvent("chalk:settings", {
-        detail: { accentColor, displayName, hideOffToday, compactMode, kanbanMode, ...patch },
+        detail: {
+          accentColor, displayName, hideOffToday, compactMode, kanbanMode,
+          ...patchCamel,
+        },
       }));
     } catch (e) {
       setPageError(e.message);
@@ -338,7 +354,7 @@ export default function SettingsPage() {
         <Section title="Layout" icon={LayoutGrid} accent={accentColor}>
           <ToggleRow
             label="Kanban Mode"
-            description="Streaks are grouped by scheduled day. Missions are grouped by priority (High / Med / Low). Toggle also appears on each page."
+            description="Streaks are grouped together by scheduled day. This gives you a clearer picture of your weekly rhythm and helps prevent over-scheduling on certain days."
             value={kanbanMode}
             onChange={v => handleToggle("kanban_mode", setKanbanMode, v)}
             accentColor={accentColor}
