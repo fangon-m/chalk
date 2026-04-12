@@ -354,7 +354,7 @@ export default function SettingsPage() {
         <Section title="Layout" icon={LayoutGrid} accent={accentColor}>
           <ToggleRow
             label="Kanban Mode"
-            description="Streaks are grouped together by scheduled day. This gives you a clearer picture of your weekly rhythm and helps prevent over-scheduling on certain days."
+            description="Streaks are grouped by scheduled day. Missions are grouped by priority (High / Med / Low). Toggle also appears on each page."
             value={kanbanMode}
             onChange={v => handleToggle("kanban_mode", setKanbanMode, v)}
             accentColor={accentColor}
@@ -362,15 +362,17 @@ export default function SettingsPage() {
         </Section>
 
         {/* ── Streaks ── */}
-        <Section title="Streaks" icon={Flame} accent={accentColor}>
-          <ToggleRow
-            label="Hide Off-Today Streaks"
-            description="In the Pending tab, streaks that aren't scheduled today are hidden instead of shown grayed out."
-            value={hideOffToday}
-            onChange={v => handleToggle("hide_off_today", setHideOffToday, v)}
-            accentColor={accentColor}
-          />
-        </Section>
+        {!kanbanMode && (
+          <Section title="Streaks" icon={Flame} accent={accentColor}>
+            <ToggleRow
+              label="Hide Off-Today Streaks"
+              description="Streaks that aren't scheduled today are hidden instead of shown grayed out."
+              value={hideOffToday}
+              onChange={v => handleToggle("hide_off_today", setHideOffToday, v)}
+              accentColor={accentColor}
+            />
+          </Section>
+        )}
 
         {/* ── Data ── */}
         <Section title="Data" icon={Database} accent={accentColor}>
