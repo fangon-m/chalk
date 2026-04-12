@@ -482,17 +482,17 @@ function StreakKanban({ enriched, onCheckIn, checkingIn, accentColor, onEdit }) 
         ))}
       </div>
 
-      {/* History drawer */}
+      {/* History modal — centered, shows calendar + connected missions */}
       {historyStreak && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center"
-          style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)" }}
           onClick={() => setHistoryStreak(null)}>
           <div
-            className="w-full max-w-2xl mx-4 mb-6 rounded-2xl border border-white/10 overflow-hidden"
+            className="w-full max-w-2xl mx-4 rounded-2xl border border-white/10 overflow-hidden"
             style={{ background: "#111" }}
             onClick={e => e.stopPropagation()}>
-            {/* Drawer header */}
+            {/* Modal header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
               <div className="flex items-center gap-2.5">
                 <Flame size={12} style={{ color: getFlameColor(historyStreak.current_streak ?? 0, accentColor) }} />
@@ -512,7 +512,7 @@ function StreakKanban({ enriched, onCheckIn, checkingIn, accentColor, onEdit }) 
                 </button>
               </div>
             </div>
-            {/* Calendar */}
+            {/* Body: calendar + connected missions side by side */}
             <div className="px-5 py-4">
               {loadingLogs ? (
                 <div className="flex items-center gap-2 text-white/25">
@@ -520,12 +520,24 @@ function StreakKanban({ enriched, onCheckIn, checkingIn, accentColor, onEdit }) 
                   <span className="font-mono text-[10px]">Loading...</span>
                 </div>
               ) : (
-                <CalendarStrip
-                  logs={logs || []}
-                  scheduledDays={historyStreak.scheduled_days}
-                  createdAt={historyStreak.created_at}
-                  accentColor={accentColor}
-                />
+                <div className="flex gap-5">
+                  <div className="shrink-0">
+                    <CalendarStrip
+                      logs={logs || []}
+                      scheduledDays={historyStreak.scheduled_days}
+                      createdAt={historyStreak.created_at}
+                      accentColor={accentColor}
+                    />
+                  </div>
+                  <div className="w-px self-stretch shrink-0" style={{ background: "rgba(255,255,255,0.06)" }} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Target size={10} className="text-white/25" />
+                      <span className="font-mono text-[10px] tracking-widest text-white/25 uppercase">Connected Missions</span>
+                    </div>
+                    <ConnectedMissions streakId={historyStreak.id} />
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -598,9 +610,9 @@ function StreakModal({ streak, onClose, onSave, accentColor }) {
 // ── Kanban Header ────────────────────────────────────────────────────────────
 
 // Width = 7 columns × 180px + 6 gaps × 8px = 1308px, matching the board exactly
-function KanbanHeader({ totalCount, accentColor, onNew, kanban, onToggle, globalKanban, localKanban }) {
+function KanbanHeader({ totalCount, accentColor, onNew, kanban, onToggle }) {
   return (
-    <div className="flex items-center justify-between mb-5" style={{ width: 1110 }}>
+    <div className="flex items-center justify-between mb-5 w-full">
       <div>
         <div className="flex items-center gap-2 mb-1">
           <Flame size={14} style={{ color: accentColor }} />
@@ -765,23 +777,25 @@ export default function Streaks() {
           <button onClick={() => { setEditingStreak(null); setShowModal(true); }} className="px-5 py-2.5 rounded-xl font-mono text-xs tracking-widest cursor-pointer" style={{ background: accentColor, color: "#0d0d0d" }}>GET STARTED</button>
         </div>
       ) : kanban ? (
-        <div className="pt-10 pb-10 flex flex-col items-center">
-          <KanbanHeader
-            totalCount={totalCount}
-            accentColor={accentColor}
-            onNew={() => { setEditingStreak(null); setShowModal(true); }}
-            kanban={kanban}
-            onToggle={v => setLocalKanban(v === globalKanban ? null : v)}
-            globalKanban={globalKanban}
-            localKanban={localKanban}
-          />
-          <StreakKanban
-            enriched={enriched}
-            onCheckIn={handleCheckIn}
-            checkingIn={checkingIn}
-            accentColor={accentColor}
-            onEdit={s => { setEditingStreak(s); setShowModal(true); }}
-          />
+        // inline-flex column: the wrapper shrinks to the board width,
+        // so KanbanHeader w-full naturally matches the board edges exactly
+        <div className="pt-10 pb-10 flex justify-center">
+          <div className="flex flex-col" style={{ width: "fit-content" }}>
+            <KanbanHeader
+              totalCount={totalCount}
+              accentColor={accentColor}
+              onNew={() => { setEditingStreak(null); setShowModal(true); }}
+              kanban={kanban}
+              onToggle={v => setLocalKanban(v === globalKanban ? null : v)}
+            />
+            <StreakKanban
+              enriched={enriched}
+              onCheckIn={handleCheckIn}
+              checkingIn={checkingIn}
+              accentColor={accentColor}
+              onEdit={s => { setEditingStreak(s); setShowModal(true); }}
+            />
+          </div>
         </div>
       ) : (
         <div className="max-w-2xl mx-auto px-6 pb-10">
