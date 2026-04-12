@@ -397,7 +397,7 @@ function KanbanStreakCard({ streak, onCheckIn, checkingIn, accentColor, onShowHi
 function KanbanColumn({ day, streaks, todayDow, onCheckIn, checkingIn, accentColor, onShowHistory }) {
   const isToday = day.value === todayDow;
   return (
-    <div className="flex flex-col w-[152px] shrink-0">
+    <div className="flex flex-col w-38 shrink-0">
       {/* Header */}
       <div className="flex items-center gap-1.5 px-2.5 py-1.5 mb-2 rounded-lg"
         style={{
