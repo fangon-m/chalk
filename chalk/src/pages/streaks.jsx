@@ -263,6 +263,7 @@ function StreakCard({ streak, onCheckIn, onEdit, onDelete, checkingIn, accentCol
   return (
     <div className="group relative rounded-2xl border border-white/8 transition-all duration-200 overflow-hidden hover:border-white/20"
       style={{ background: "#111", opacity: scheduledToday ? 1 : 0.5 }}>
+      <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-2xl" style={{ background: cardAccent }} />
       <div className="px-5 py-4 pl-6">
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -351,6 +352,7 @@ function KanbanStreakCard({ streak, onCheckIn, checkingIn, accentColor, onShowHi
   return (
     <div className="relative rounded-xl border border-white/8 overflow-hidden transition-all hover:border-white/18"
       style={{ background: "#111", opacity: isColumnToday ? 1 : 0.5 }}>
+      <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-xl" style={{ background: cardAccent }} />
       <div className="pl-3 pr-2.5 py-2">
         {/* Row 1: check + name */}
         <div className="flex items-center gap-1.5 mb-1.5">
@@ -395,8 +397,7 @@ function KanbanStreakCard({ streak, onCheckIn, checkingIn, accentColor, onShowHi
 function KanbanColumn({ day, streaks, todayDow, onCheckIn, checkingIn, accentColor, onShowHistory }) {
   const isToday = day.value === todayDow;
   return (
-    <div className="rounded-xl border border-white/10 p-2.5 shrink-0" style={{ background: "#111", width: 180 }}>
-      <div className="flex flex-col h-full">
+    <div className="flex flex-col w-[152px] shrink-0">
       {/* Header */}
       <div className="flex items-center gap-1.5 px-2.5 py-1.5 mb-2 rounded-lg"
         style={{
@@ -437,7 +438,6 @@ function KanbanColumn({ day, streaks, todayDow, onCheckIn, checkingIn, accentCol
         ))}
       </div>
     </div>
-    </div>
   );
 }
 
@@ -466,7 +466,7 @@ function StreakKanban({ enriched, onCheckIn, checkingIn, accentColor, onEdit }) 
   return (
     <>
       {/* Board */}
-      <div className="flex gap-2 overflow-x-auto pb-3" style={{ scrollSnapType: "x mandatory" }}>
+      <div className="flex gap-2 justify-center pb-3">
         {DAYS.map(day => (
           <div key={day.value} style={{ scrollSnapAlign: "start" }}>
             <KanbanColumn
@@ -595,6 +595,33 @@ function StreakModal({ streak, onClose, onSave, accentColor }) {
   );
 }
 
+// ── Kanban Header ────────────────────────────────────────────────────────────
+
+// Width = 7 columns × 180px + 6 gaps × 8px = 1308px, matching the board exactly
+function KanbanHeader({ totalCount, accentColor, onNew, kanban, onToggle, globalKanban, localKanban }) {
+  return (
+    <div className="flex items-center justify-between mb-5" style={{ width: 1110 }}>
+      <div>
+        <div className="flex items-center gap-2 mb-1">
+          <Flame size={14} style={{ color: accentColor }} />
+          <span className="font-mono text-[11px] tracking-widest text-white/30 uppercase">Chalk / Streaks</span>
+        </div>
+        <h1 className="text-2xl font-mono text-white">
+          Streaks <span className="ml-2 text-sm" style={{ color: accentColor }}>{totalCount}</span>
+        </h1>
+      </div>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onNew}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs tracking-widest transition-all hover:opacity-90 active:scale-95 cursor-pointer"
+          style={{ background: accentColor, color: "#0d0d0d", fontWeight: "500" }}>
+          <Plus size={13} /> NEW STREAK
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Streaks Page ─────────────────────────────────────────────────────────
 
 export default function Streaks() {
@@ -681,29 +708,28 @@ export default function Streaks() {
         option { background: #111; color: white; }
       `}</style>
 
-      {/* Header + controls — always constrained */}
-      <div className="max-w-2xl mx-auto px-6 pt-10">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Flame size={14} style={{ color: accentColor }} />
-              <span className="font-mono text-[11px] tracking-widest text-white/30 uppercase">Chalk / Streaks</span>
+      {/* List-mode header — constrained. Kanban header lives inside StreakKanban wrapper */}
+      {!kanban && (
+        <div className="max-w-2xl mx-auto px-6 pt-10">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Flame size={14} style={{ color: accentColor }} />
+                <span className="font-mono text-[11px] tracking-widest text-white/30 uppercase">Chalk / Streaks</span>
+              </div>
+              <h1 className="text-2xl font-mono text-white">
+                Streaks <span className="ml-2 text-sm" style={{ color: accentColor }}>{totalCount}</span>
+              </h1>
             </div>
-            <h1 className="text-2xl font-mono text-white">
-              Streaks <span className="ml-2 text-sm" style={{ color: accentColor }}>{totalCount}</span>
-            </h1>
+            <button onClick={() => { setEditingStreak(null); setShowModal(true); }}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs tracking-widest transition-all hover:opacity-90 active:scale-95 cursor-pointer"
+              style={{ background: accentColor, color: "#0d0d0d", fontWeight: "500" }}>
+              <Plus size={13} /> NEW STREAK
+            </button>
           </div>
-          <button onClick={() => { setEditingStreak(null); setShowModal(true); }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs tracking-widest transition-all hover:opacity-90 active:scale-95 cursor-pointer"
-            style={{ background: accentColor, color: "#0d0d0d", fontWeight: "500" }}>
-            <Plus size={13} /> NEW STREAK
-          </button>
-        </div>
-
-        {totalCount > 0 && (
-          <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-            <div className="flex items-center gap-3">
-              {!kanban && (
+          {totalCount > 0 && (
+            <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+              <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: "#111" }}>
                   <button onClick={() => setTab("active")}
                     className="px-4 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all cursor-pointer"
@@ -716,22 +742,20 @@ export default function Streaks() {
                     DONE TODAY
                   </button>
                 </div>
-              )}
-            </div>
-            {!kanban && (
+                <ViewToggle kanban={kanban} onToggle={v => setLocalKanban(v === globalKanban ? null : v)} accentColor={accentColor} />
+              </div>
               <div className="font-mono text-[10px] tracking-widest text-white/25">{doneCount} / {scheduledCount} CHECKED IN</div>
-            )}
-          </div>
-        )}
-
-        {pageError && (
-          <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 mb-4">
-            <AlertTriangle size={13} className="text-red-400 shrink-0" />
-            <span className="font-mono text-xs text-red-400 flex-1">{pageError}</span>
-            <button onClick={() => setPageError("")} className="text-red-400/60 hover:text-red-400 transition-colors cursor-pointer"><X size={13} /></button>
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+          {pageError && (
+            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 mb-4">
+              <AlertTriangle size={13} className="text-red-400 shrink-0" />
+              <span className="font-mono text-xs text-red-400 flex-1">{pageError}</span>
+              <button onClick={() => setPageError("")} className="text-red-400/60 hover:text-red-400 transition-colors cursor-pointer"><X size={13} /></button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Content — kanban uses full width, list stays constrained */}
       {totalCount === 0 ? (
@@ -742,7 +766,16 @@ export default function Streaks() {
           <button onClick={() => { setEditingStreak(null); setShowModal(true); }} className="px-5 py-2.5 rounded-xl font-mono text-xs tracking-widest cursor-pointer" style={{ background: accentColor, color: "#0d0d0d" }}>GET STARTED</button>
         </div>
       ) : kanban ? (
-        <div className="px-6 pb-10">
+        <div className="pt-10 pb-10 flex flex-col items-center">
+          <KanbanHeader
+            totalCount={totalCount}
+            accentColor={accentColor}
+            onNew={() => { setEditingStreak(null); setShowModal(true); }}
+            kanban={kanban}
+            onToggle={v => setLocalKanban(v === globalKanban ? null : v)}
+            globalKanban={globalKanban}
+            localKanban={localKanban}
+          />
           <StreakKanban
             enriched={enriched}
             onCheckIn={handleCheckIn}
