@@ -361,7 +361,7 @@ function MissionStatRow({ mission, accentColor }) {
 // ── Main Stats Page ───────────────────────────────────────────────────────────
 
 export default function Stats() {
-  const { accentColor } = useSettings();
+  const { accentColor, bgColor } = useSettings();
 
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
@@ -440,13 +440,13 @@ export default function Stats() {
   }, [isComplete, awardSeen, loading, streaks.length]);
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: "#0d0d0d" }}>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: bgColor }}>
       <p className="font-mono text-white/20 text-xs tracking-widest animate-pulse">LOADING...</p>
     </div>
   );
 
   return (
-    <div className="min-h-screen" style={{ background: "#0d0d0d", fontFamily: "'DM Mono', monospace" }}>
+    <div className="min-h-screen" style={{ background: bgColor, fontFamily: "'DM Mono', monospace" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap');
         * { font-family: 'DM Mono', monospace; }
