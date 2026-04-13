@@ -18,6 +18,17 @@ const ACCENT_PRESETS = [
   { label: "Amber",   color: "#fbbf24" },
 ];
 
+const BG_PRESETS = [
+  { label: "Pure Black",   color: "#080808" },
+  { label: "Off Black",    color: "#0d0d0d" },
+  { label: "Dark",         color: "#111111" },
+  { label: "Semi-Dark",    color: "#131313" },
+  { label: "Dim",          color: "#161616" },
+  { label: "Charcoal",     color: "#1a1a1a" },
+  { label: "Dark Gray",    color: "#202020" },
+  { label: "Gray",         color: "#262626" },
+];
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function Section({ title, icon: Icon, accent = "#c8f04c", children }) {
@@ -92,6 +103,7 @@ export default function SettingsPage() {
   const [hideOffToday, setHideOffToday] = useState(false);
   const [compactMode, setCompactMode]   = useState(false);
   const [kanbanMode, setKanbanMode]     = useState(false);
+  const [bgColor, setBgColor]           = useState("#0d0d0d");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -114,6 +126,7 @@ export default function SettingsPage() {
         setHideOffToday(data.hide_off_today ?? false);
         setCompactMode(data.compact_mode ?? false);
         setKanbanMode(data.kanban_mode ?? false);
+        setBgColor(data.bg_color || "#0d0d0d");
       }
     } catch (e) {
       setPageError(e.message);
@@ -137,6 +150,7 @@ export default function SettingsPage() {
           hide_off_today: hideOffToday,
           compact_mode:   compactMode,
           kanban_mode:    kanbanMode,
+          bg_color:       bgColor,
           updated_at:     new Date().toISOString(),
           ...patch,
         }, { onConflict: "user_id" });
@@ -148,6 +162,7 @@ export default function SettingsPage() {
       // always carries the true new value, not the stale closure value.
       const keyMap = {
         accent_color:   "accentColor",
+        bg_color:       "bgColor",
         compact_mode:   "compactMode",
         hide_off_today: "hideOffToday",
         kanban_mode:    "kanbanMode",
@@ -158,7 +173,7 @@ export default function SettingsPage() {
       );
       window.dispatchEvent(new CustomEvent("chalk:settings", {
         detail: {
-          accentColor, displayName, hideOffToday, compactMode, kanbanMode,
+          accentColor, displayName, hideOffToday, compactMode, kanbanMode, bgColor,
           ...patchCamel,
         },
       }));
@@ -172,6 +187,11 @@ export default function SettingsPage() {
   function handleAccent(color) {
     setAccentColor(color);
     persist({ accent_color: color });
+  }
+
+  function handleBgColor(color) {
+    setBgColor(color);
+    persist({ bg_color: color });
   }
 
   function handleToggle(key, setter, value) {
@@ -250,7 +270,7 @@ export default function SettingsPage() {
   );
 
   return (
-    <div className="min-h-screen" style={{ background: "#0d0d0d", fontFamily: "'DM Mono', monospace" }}>
+    <div className="min-h-screen" style={{ background: bgColor, fontFamily: "'DM Mono', monospace" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap');
         * { font-family: 'DM Mono', monospace; }
@@ -341,13 +361,56 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <ToggleRow
-            label="Compact Mode"
-            description="Reduces spacing and padding throughout the app for a denser layout."
-            value={compactMode}
-            onChange={v => handleToggle("compact_mode", setCompactMode, v)}
-            accentColor={accentColor}
-          />
+          {/* Background color */}
+          <div>
+            <label className="block font-mono text-[10px] tracking-widest text-white/40 uppercase mb-3">
+              Background
+            </label>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {BG_PRESETS.map(({ label, color }) => (
+                <button
+                  key={color}
+                  onClick={() => handleBgColor(color)}
+                  title={label}
+                  className="w-8 h-8 rounded-lg transition-all cursor-pointer relative border"
+                  style={{
+                    background: color,
+                    borderColor: bgColor === color ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.1)",
+                    outline: bgColor === color ? "2px solid rgba(255,255,255,0.25)" : "2px solid transparent",
+                    outlineOffset: 2,
+                    transform: bgColor === color ? "scale(1.15)" : "scale(1)",
+                  }}
+                >
+                  {bgColor === color && (
+                    <Check size={12} className="absolute inset-0 m-auto" style={{ color: "rgba(255,255,255,0.6)" }} />
+                  )}
+                </button>
+              ))}
+              {/* Custom bg color */}
+              <label
+                title="Custom background"
+                className="w-8 h-8 rounded-lg cursor-pointer flex items-center justify-center transition-all relative overflow-hidden"
+                style={{
+                  background: "rgba(255,255,255,0.06)",
+                  border: "1px dashed rgba(255,255,255,0.2)",
+                  outline: !BG_PRESETS.find(p => p.color === bgColor) ? "2px solid rgba(255,255,255,0.25)" : "2px solid transparent",
+                  outlineOffset: 2,
+                }}
+              >
+                <input
+                  type="color"
+                  value={bgColor}
+                  onChange={e => handleBgColor(e.target.value)}
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                />
+                <span className="font-mono text-white/40" style={{ fontSize: 14, lineHeight: 1 }}>+</span>
+              </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded border border-white/15" style={{ background: bgColor }} />
+              <span className="font-mono text-[10px] text-white/30">{bgColor.toUpperCase()}</span>
+            </div>
+          </div>
         </Section>
 
         {/* ── Layout ── */}
@@ -366,7 +429,7 @@ export default function SettingsPage() {
           <Section title="Streaks" icon={Flame} accent={accentColor}>
             <ToggleRow
               label="Hide Off-Today Streaks"
-              description="Streaks that aren't scheduled today are hidden instead of shown grayed out."
+              description="In the Pending tab, streaks that aren't scheduled today are hidden instead of shown grayed out."
               value={hideOffToday}
               onChange={v => handleToggle("hide_off_today", setHideOffToday, v)}
               accentColor={accentColor}
