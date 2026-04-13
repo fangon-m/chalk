@@ -3,17 +3,17 @@ import { supabase } from "../lib/supabase";
 
 const SettingsContext = createContext({
   accentColor:  "#c8f04c",
-  compactMode:  false,
   hideOffToday: false,
   kanbanMode:   false,
+  bgColor:      "#0d0d0d",
 });
 
 export function SettingsProvider({ children }) {
   const [settings, setSettings] = useState({
     accentColor:  "#c8f04c",
-    compactMode:  false,
     hideOffToday: false,
     kanbanMode:   false,
+    bgColor:      "#0d0d0d",
   });
 
   useEffect(() => {
@@ -28,9 +28,9 @@ export function SettingsProvider({ children }) {
       if (data) {
         setSettings({
           accentColor:  data.accent_color  || "#c8f04c",
-          compactMode:  data.compact_mode  ?? false,
           hideOffToday: data.hide_off_today ?? false,
           kanbanMode:   data.kanban_mode   ?? false,
+          bgColor:      data.bg_color      || "#0d0d0d",
         });
       }
     }
@@ -40,14 +40,20 @@ export function SettingsProvider({ children }) {
       setSettings(prev => ({
         ...prev,
         accentColor:  e.detail.accentColor  ?? prev.accentColor,
-        compactMode:  e.detail.compactMode  ?? prev.compactMode,
         hideOffToday: e.detail.hideOffToday ?? prev.hideOffToday,
         kanbanMode:   e.detail.kanbanMode   ?? prev.kanbanMode,
+        bgColor:      e.detail.bgColor      ?? prev.bgColor,
       }));
     }
     window.addEventListener("chalk:settings", handleUpdate);
     return () => window.removeEventListener("chalk:settings", handleUpdate);
   }, []);
+
+  // Keep document body background in sync so every page picks it up
+  useEffect(() => {
+    document.body.style.background = settings.bgColor;
+    document.documentElement.style.background = settings.bgColor;
+  }, [settings.bgColor]);
 
   return (
     <SettingsContext.Provider value={settings}>
