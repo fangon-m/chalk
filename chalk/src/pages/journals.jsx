@@ -554,7 +554,7 @@ function JournalCard({ journal, folders, onEdit, onSoftDelete, onMove, onDragSta
         onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; onDragStart(journal.id); }}
         onDragEnd={onDragEnd}
       >
-        <div className="absolute left-0 top-0 bottom-0 w-0.5"/>
+        <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{ background: `${accentColor}40` }} />
         <div className="px-5 py-4 pl-6">
           <div className="flex items-start justify-between gap-3 mb-2">
             <h3 className="font-mono text-sm text-white leading-snug flex-1 min-w-0 truncate">
@@ -940,7 +940,7 @@ function RecentlyDeletedSection({ deletedJournals, deletedFolders, journalsInDel
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function Journals() {
-  const { accentColor } = useSettings();
+  const { accentColor, bgColor } = useSettings();
 
   const [journals, setJournals] = useState([]);
   const [deletedJournals, setDeletedJournals] = useState([]);
@@ -1075,13 +1075,13 @@ export default function Journals() {
   }
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: "#0d0d0d" }}>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: bgColor }}>
       <p className="font-mono text-white/20 text-xs tracking-widest animate-pulse">LOADING...</p>
     </div>
   );
 
   return (
-    <div className="min-h-screen" style={{ background: "#0d0d0d", fontFamily: "'DM Mono', monospace" }}>
+    <div className="min-h-screen" style={{ background: bgColor, fontFamily: "'DM Mono', monospace" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap');
         * { font-family: 'DM Mono', monospace; }
