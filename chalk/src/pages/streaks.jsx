@@ -397,7 +397,7 @@ function KanbanStreakCard({ streak, onCheckIn, checkingIn, accentColor, onShowHi
 function KanbanColumn({ day, streaks, todayDow, onCheckIn, checkingIn, accentColor, onShowHistory }) {
   const isToday = day.value === todayDow;
   return (
-    <div className="flex flex-col w-38 shrink-0">
+    <div className="flex flex-col w-[152px] shrink-0">
       {/* Header */}
       <div className="flex items-center gap-1.5 px-2.5 py-1.5 mb-2 rounded-lg"
         style={{
@@ -607,6 +607,25 @@ function StreakModal({ streak, onClose, onSave, accentColor }) {
   );
 }
 
+// ── View Toggle ───────────────────────────────────────────────────────────────
+
+function ViewToggle({ kanban, onToggle, accentColor }) {
+  return (
+    <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: "#111" }}>
+      <button onClick={() => onToggle(false)}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all cursor-pointer"
+        style={{ background: !kanban ? accentColor : "transparent", color: !kanban ? "#0d0d0d" : "rgba(255,255,255,0.3)" }}>
+        <List size={11} /> LIST
+      </button>
+      <button onClick={() => onToggle(true)}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[10px] tracking-widest transition-all cursor-pointer"
+        style={{ background: kanban ? accentColor : "transparent", color: kanban ? "#0d0d0d" : "rgba(255,255,255,0.3)" }}>
+        <LayoutGrid size={11} /> KANBAN
+      </button>
+    </div>
+  );
+}
+
 // ── Kanban Header ────────────────────────────────────────────────────────────
 
 // Width = 7 columns × 180px + 6 gaps × 8px = 1308px, matching the board exactly
@@ -623,6 +642,7 @@ function KanbanHeader({ totalCount, accentColor, onNew, kanban, onToggle }) {
         </h1>
       </div>
       <div className="flex items-center gap-3">
+        <ViewToggle kanban={kanban} onToggle={onToggle} accentColor={accentColor} />
         <button
           onClick={onNew}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs tracking-widest transition-all hover:opacity-90 active:scale-95 cursor-pointer"
@@ -637,7 +657,7 @@ function KanbanHeader({ totalCount, accentColor, onNew, kanban, onToggle }) {
 // ── Main Streaks Page ─────────────────────────────────────────────────────────
 
 export default function Streaks() {
-  const { accentColor, hideOffToday, kanbanMode: globalKanban } = useSettings();
+  const { accentColor, hideOffToday, kanbanMode: globalKanban, bgColor } = useSettings();
   const [localKanban, setLocalKanban] = useState(null);
   const kanban = localKanban !== null ? localKanban : globalKanban;
 
@@ -704,13 +724,13 @@ export default function Streaks() {
         });
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: "#0d0d0d" }}>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: bgColor }}>
       <p className="font-mono text-white/20 text-xs tracking-widest animate-pulse">LOADING...</p>
     </div>
   );
 
   return (
-    <div className="min-h-screen" style={{ background: "#0d0d0d", fontFamily: "'DM Mono', monospace" }}>
+    <div className="min-h-screen" style={{ background: bgColor, fontFamily: "'DM Mono', monospace" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap');
         * { font-family: 'DM Mono', monospace; }
@@ -754,6 +774,7 @@ export default function Streaks() {
                     DONE TODAY
                   </button>
                 </div>
+                <ViewToggle kanban={kanban} onToggle={v => setLocalKanban(v === globalKanban ? null : v)} accentColor={accentColor} />
               </div>
               <div className="font-mono text-[10px] tracking-widest text-white/25">{doneCount} / {scheduledCount} CHECKED IN</div>
             </div>
